@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+      body { padding: 20px; font-family: 'Segoe UI', Tahoma, sans-serif; color: #333; }
+      .header-flex { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+      .controls-bar { display: flex; justify-content: space-between; align-items: center; background: #f1f3f4; padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; }
+      
+      table { width: 100%; border-collapse: collapse; }
+      th { text-align: left; padding: 12px; border-bottom: 2px solid #008080; color: #008080; text-transform: uppercase; font-size: 12px; }
+      td { padding: 12px; border-bottom: 1px solid #eee; vertical-align: middle; }
+      
+      .btn { padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; font-weight: 600; transition: 0.2s; }
+      .btn-print { background-color: #008080; color: white; }
+      .btn-bulk { background-color: #ff8c00; color: white; }
+      .btn:disabled { background-color: #ccc; cursor: not-allowed; }
+      
+      .status-badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: bold; }
+      .ready { background: #fff3e0; color: #e67e22; }
+      .printed { background: #e0f2f1; color: #008080; }
+      
+      .switch-label { font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 10px; cursor: pointer; }
+      .loader { border: 3px solid #f3f3f3; border-top: 3px solid #008080; border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; display: inline-block; vertical-align: middle; margin-right: 10px; }
+      @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+  </head>
+  <body>
+    <div class="header-flex">
+      <h2 style="margin:0; color:#008080;">Print Management</h2>
+      <button id="bulk-btn" class="btn btn-bulk" onclick="processBulk()">
+        <i class="fas fa-layer-group"></i> BULK PRINT ALL PENDING
+      </button>
+    </div>
+
+    <div class="controls-bar">
+      <span style="font-size:12px; color:#666;">View and manage your generated invoices.</span>
+      <label class="switch-label">
+        Show Printed History
+        <input type="checkbox" id="filter-toggle" onchange="loadData()">
+      </label>
+    </div>
+
+    <div id="loading" style="text-align:center; padding:50px;">
+      <div class="loader"></div> Loading invoices...
+    </div>
+
+    <table id="main-table" style="display:none;">
+      <thead>
+        <tr>
+          <th>Invoice Num</th>
+          <th>Customer Info</th>
+          <th>Status</th>
+          <th style="text-align:right">Action</th>
+        </tr>
+      </thead>
+      <tbody id="table-body"></tbody>
+    </table>
+
+    <div id="empty-msg" style="display:none; text-align:center; padding:50px; color:#999;">
+      <i class="fas fa-info-circle"></i> No invoices found in this view.
+    </div>
+
+    <script>
+      window.onload = loadData;
+
+      function loadData() {
+        const showAll = document.getElementById('filter-toggle').checked;
+        document.getElementById('loading').style.display = 'block';
+        document.getElementById('main-table').style.display = 'none';
+        document.getElementById('empty-msg').style.display = 'none';
+
+        google.script.run
+          .withSuccessHandler(drawTable)
+          .withFailureHandler(e => { alert(e); document.getElementById('loading').style.display='none'; })
+          .getInvoicesForPreview(showAll);
+      }
+
+      function drawTable(data) {
+        const body = document.getElementById('table-body');
+        document.getElementById('loading').style.display = 'none';
+        body.innerHTML = '';
+
+        if (!data || data.length === 0) {
+          document.getElementById('empty-msg').style.display = 'block';
+          return;
+        }
+
+        document.getElementById('main-table').style.display = 'table';
+        data.forEach(inv => {
+          const isPrinted = inv.status === "Printed";
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td><strong>${inv.invoiceNo}</strong></td>
+            <td>${inv.customerName}<br><small style="color:#888">${inv.products}</small></td>
+            <td>
+              <span class="status-badge ${isPrinted ? 'printed' : 'ready'}">
+                <i class="fas ${isPrinted ? 'fa-check-circle' : 'fa-clock'}"></i>
+                ${inv.status.toUpperCase()}
+              </span>
+            </td>
+            <td style="text-align:right">
+              <button class="btn btn-print" onclick="doPrint('${inv.link}', ${inv.row}, ${isPrinted})">
+                <i class="fas fa-print"></i> ${isPrinted ? 'RE-PRINT' : 'PRINT'}
+              </button>
+            </td>
+          `;
+          body.appendChild(row);
+        });
+      }
+
+      function doPrint(link, row, alreadyPrinted) {
+        window.open(link, '_blank');
+        if (!alreadyPrinted) {
+          google.script.run.withSuccessHandler(loadData).markAsPrinted(row);
+        }
+      }
+
+      function processBulk() {
+        const btn = document.getElementById('bulk-btn');
+        btn.disabled = true;
+        btn.innerHTML = '<div class="loader"></div> Generating PDF...';
+
+        google.script.run
+          .withSuccessHandler(url => {
+            if (url && url.startsWith('http')) {
+              window.open(url, '_blank');
+              loadData();
+            } else { alert(url); }
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-layer-group"></i> BULK PRINT ALL PENDING';
+          })
+          .withFailureHandler(e => { alert(e); btn.disabled = false; })
+          .generateBulkPDF();
+      }
+    </script>
+  </body>
+</html>

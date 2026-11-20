@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .container { padding: 15px 20px; font-family: 'Segoe UI', sans-serif; }
+        .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .card { background: white; padding: 15px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .card h3 { margin-top: 0; color: #006666; border-bottom: 1px solid #f1f5f9; padding-bottom: 8px; margin-bottom: 12px; font-size: 16px; display: flex; justify-content: space-between; align-items: center; }
+        .total-box { background: #e0f2f1; color: #006666; padding: 4px 12px; border-radius: 50px; font-size: 14px; font-weight: 800; border: 1px solid #b2dfdb; position: relative; cursor: pointer; transition: 0.2s; }
+        .total-box:hover { background: #b2dfdb; }
+        .total-box:hover .total-tooltip { display: block; }
+        .total-tooltip { display: none; position: absolute; top: 100%; right: 0; background: white; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); padding: 12px; z-index: 500; min-width: 180px; margin-top: 8px; pointer-events: none; }
+        
+        .breakdown-modal-content { background: white; margin: 10% auto; width: 550px; border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); overflow: hidden; }
+        .breakdown-header { padding: 15px 20px; background: #006666; color: white; display: flex; justify-content: space-between; align-items: center; }
+        .breakdown-body { padding: 10px 20px 20px 20px; }
+        
+        .tooltip-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        .tooltip-table th { text-align: left; font-size: 10px; color: #94a3b8; text-transform: uppercase; padding-bottom: 8px; border-bottom: 2px solid #f1f5f9; }
+        .tooltip-table td { padding: 8px 0; font-size: 12px; color: #475569; border-bottom: 1px solid #f1f5f9; }
+        .tooltip-table .val { text-align: right; font-weight: 600; color: #1e293b; padding-left: 10px; }
+        .tooltip-table .total-val { color: #006666; font-weight: 800; }
+        .tooltip-title { font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.5px; }
+
+        .controls-bar { display: flex; align-items: center; gap: 15px; background: white; padding: 10px 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #e2e8f0; }
+        .search-box { flex: 1; min-width: 200px; position: relative; }
+        .search-box input { width: 100%; padding: 6px 10px 6px 35px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 13px; }
+        .search-box i { position: absolute; left: 12px; top: 9px; color: #94a3b8; font-size: 12px; }
+        .date-filter { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #64748b; }
+        .date-filter input { padding: 5px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 12px; }
+        .btn { padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; display: flex; align-items: center; gap: 6px; font-size: 13px; transition: 0.2s; }
+        .btn-primary { background: #006666; color: white; }
+        .btn-report { background: #ff8c00; color: white; }
+        .exp-table { width: 100%; border-collapse: collapse; }
+        .exp-table th { text-align: left; padding: 10px; background: #f8fafc; color: #64748b; font-size: 11px; text-transform: uppercase; border-bottom: 1px solid #e2e8f0; }
+        .exp-table td { padding: 8px 10px; border-bottom: 1px solid #f1f5f9; font-size: 12px; vertical-align: middle; }
+        .status-pill { padding: 2px 10px; border-radius: 50px; font-size: 10px; font-weight: 700; text-transform: uppercase; display: inline-block; min-width: 60px; text-align: center; }
+        .status-pending { background: #fef3c7; color: #92400e; }
+        .status-approved { background: #dcfce7; color: #166534; }
+        .status-rejected { background: #fee2e2; color: #991b1b; }
+        .btn-action { padding: 4px 8px; border-radius: 4px; font-size: 10px; border: none; cursor: pointer; color: white; font-weight: bold; }
+        .modal { display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); z-index: 1000; backdrop-filter: blur(4px); }
+        .modal-content { background: white; margin: 5% auto; width: 400px; border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); }
+        .modal-header { padding: 15px 20px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; }
+        .modal-body { padding: 20px; }
+        .form-group { margin-bottom: 12px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: 600; font-size: 12px; }
+        .form-control { width: 100%; padding: 8px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 13px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="page-header">
+        <div><h2 style="margin:0; color:#1e293b; font-size:20px;">Expense Tracking</h2></div>
+        <div style="display:flex; gap:10px;"><button class="btn btn-report" onclick="window.printReport()"><i class="fas fa-file-pdf"></i> Report</button><button class="btn btn-primary" onclick="window.toggleExpModal(true)"><i class="fas fa-plus"></i> New Expense</button></div>
+    </div>
+    <div class="controls-bar">
+        <div class="search-box"><i class="fas fa-search"></i><input type="text" id="expSearch" placeholder="Search ID or Purpose..."></div>
+        <div class="date-filter"><span>From:</span><input type="date" id="expStart"><span>to</span><input type="date" id="expEnd"></div>
+    </div>
+    <div class="card">
+        <h3>History 
+            <span class="total-box" id="totalBoxContainer" onclick="window.toggleBreakdownModal(true)">
+                <span id="filteredTotal">0.00 BDT</span>
+                <div class="total-tooltip">
+                    <div class="tooltip-title">Click for Name-wise Summary</div>
+                </div>
+            </span>
+        </h3>
+        <div style="overflow-x: auto;">
+            <table class="exp-table" id="expTable">
+                <thead><tr><th>Date</th><th>Purpose</th><th>Amount</th><th>Status</th><th>Submitted By</th><th>Approved By</th><th style="text-align:right">Action</th></tr></thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Breakdown Modal -->
+<div id="breakdownModal" class="modal">
+    <div class="breakdown-modal-content">
+        <div class="breakdown-header">
+            <h3 style="margin:0; font-size:16px;">Expense Summary</h3>
+            <i class="fas fa-times" style="cursor:pointer;" onclick="window.toggleBreakdownModal(false)"></i>
+        </div>
+        <div class="breakdown-body">
+            <table class="tooltip-table" id="nameBreakdownTable">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th style="text-align:right">Approved</th>
+                        <th style="text-align:right">Pending</th>
+                        <th style="text-align:right">Rejected</th>
+                        <th style="text-align:right">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Dynamic rows -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div id="expenseModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header"><h3 id="modalTitle" style="margin:0; border:none; padding:0">New Expense</h3><i class="fas fa-times" style="cursor:pointer; color:#94a3b8" onclick="window.toggleExpModal(false)"></i></div>
+        <div class="modal-body">
+            <input type="hidden" id="editExpId">
+            <div class="form-group"><label>Date</label><input type="date" id="expDate" class="form-control"></div>
+            <div class="form-group"><label>Category</label><select id="expCategory" class="form-control">
+                <option value="Others Cost">Others Cost</option>
+                <option value="Office Cost">Office Cost</option>
+                <option value="Office Rent & others">Office Rent & others</option>
+                <option value="Dress Design Cost">Dress Design Cost</option>
+                <option value="Damage product">Damage product</option>
+                <option value="Employee salary">Employee salary</option>
+                <option value="Dolar$ Cost">Dolar$ Cost</option>
+                <option value="Transportation Cost">Transportation Cost</option>
+            </select></div>
+            <div class="form-group"><label>Purpose</label><input type="text" id="expFor" class="form-control"></div>
+            <div class="form-group"><label>Amount (BDT)</label><input type="number" id="expAmount" class="form-control"></div>
+            <div class="form-group"><label>Note</label><textarea id="expNote" class="form-control" rows="2"></textarea></div>
+            <button id="submitExpBtn" class="btn btn-primary" style="width:100%; justify-content:center; padding:10px" onclick="window.handleExpenseSubmit()">Submit</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    var USER_ROLE_EXP = "<?= userRole ?>";
+    var USER_NAME_EXP = "<?= userName ?>";
+    var pAllExpenses = [];
+    var pFilteredSet = [];
+
+    window.initExpenses = function() {
+        $('#expSearch, #expStart, #expEnd').on('input change', function() { window.filterAndRenderExpenses(); });
+        window.loadExpenses();
+    };
+
+    window.toggleExpModal = function(show, editData = null) { 
+        if(show) {
+            $('#expenseModal').show();
+            if(editData) {
+                $('#modalTitle').text("Edit Expense");
+                $('#editExpId').val(editData.id);
+                $('#expDate').val(window.formatDateForInput(editData.date));
+                $('#expCategory').val(editData.category);
+                $('#expFor').val(editData.expenseFor);
+                $('#expAmount').val(editData.amount);
+                $('#expNote').val(editData.note || "");
+            } else {
+                $('#modalTitle').text("New Expense");
+                $('#editExpId').val("");
+                $('#expDate').val(new Date().toISOString().split('T')[0]);
+                $('#expCategory').val("Office Cost");
+                $('#expFor, #expAmount, #expNote').val("");
+            }
+        } else {
+            $('#expenseModal').hide();
+        }
+    };
+
+    window.toggleBreakdownModal = function(show) {
+        if(show) $('#breakdownModal').show();
+        else $('#breakdownModal').hide();
+    };
+
+    window.formatDateForInput = function(sheetDate) {
+        // sheetDate is "dd-MMM-yy" or Date object
+        const d = window.parseSheetDate(sheetDate);
+        return d.toISOString().split('T')[0];
+    };
+
+    window.loadExpenses = function() {
+        google.script.run
+            .withSuccessHandler(function(data) { 
+                pAllExpenses = Array.isArray(data) ? data : []; 
+                window.filterAndRenderExpenses(); 
+            })
+            .withFailureHandler(function(err) {
+                alert("Failed to load expenses: " + err.message);
+                console.error(err);
+            })
+            .getExpenseList();
+    };
+
+    window.filterAndRenderExpenses = function() {
+        const query = ($('#expSearch').val() || "").toLowerCase();
+        const startStr = $('#expStart').val();
+        const endStr = $('#expEnd').val();
+        const userRole = (window.USER_ROLE_EXP || "").toLowerCase();
+        const isAdmin = userRole === 'admin';
+        const start = startStr ? new Date(startStr) : null;
+        const end = endStr ? new Date(endStr) : null;
+        
+        if(start) start.setHours(0,0,0,0); 
+        if(end) end.setHours(23,59,59,999);
+
+        let runningTotal = 0; 
+        let matrix = {}; // { Name: { Approved: 0, Pending: 0, Rejected: 0 } }
+        const tbody = $('#expTable tbody').empty();
+        
+        pFilteredSet = pAllExpenses.filter(e => {
+            if (!isAdmin && e.submittedBy !== window.USER_NAME_EXP) return false;
+            
+            const eDate = window.parseSheetDate(e.date);
+            if (start && eDate < start) return false; 
+            if (end && eDate > end) return false;
+            
+            if (query) {
+                const searchStr = `${e.id} ${e.submittedBy} ${e.expenseFor} ${e.category}`.toLowerCase();
+                if (!searchStr.includes(query)) return false;
+            }
+            return true;
+        });
+
+        if(pFilteredSet.length === 0) { 
+            tbody.append('<tr><td colspan="7" style="text-align:center; padding:20px;">No records.</td></tr>'); 
+            $('#filteredTotal').text("0.00 BDT"); 
+            $('#nameBreakdownTable tbody').empty().append('<tr><td colspan="5" style="text-align:center; color:#94a3b8; padding:15px;">No data in current view</td></tr>');
+            return; 
+        }
+        
+        pFilteredSet.forEach(function(e) {
+            const isPending = e.status === 'Pending';
+            let grantDenyActions = '';
+            if (isAdmin && isPending) {
+                grantDenyActions = `<button class="btn-action" style="background:#2ecc71" title="Grant" onclick="window.updateExpStatus('${e.id}', 'Approved', this)"><i class="fas fa-check"></i></button><button class="btn-action" style="background:#e74c3c" title="Deny" onclick="window.updateExpStatus('${e.id}', 'Rejected', this)"><i class="fas fa-times"></i></button>`;
+            }
+            
+            let editAction = '';
+            if (isPending && (isAdmin || e.submittedBy === window.USER_NAME_EXP)) {
+                editAction = `<button class="btn-action" style="background:#f39c12" title="Edit" onclick="window.editExpense('${e.id}')"><i class="fas fa-edit"></i></button><button class="btn-action" style="background:#e74c3c" title="Delete" onclick="window.deleteExpenseEntry('${e.id}')"><i class="fas fa-trash-alt"></i></button>`;
+            }
+
+            const amount = parseFloat(e.amount) || 0;
+            const status = e.status || 'Pending';
+            const name = e.submittedBy || 'Unknown';
+
+            // Populate Matrix
+            if (!matrix[name]) matrix[name] = { Approved: 0, Pending: 0, Rejected: 0 };
+            // Ensure status key exists in matrix[name] for safe increment
+            if (!matrix[name].hasOwnProperty(status)) matrix[name][status] = 0;
+            matrix[name][status] += amount;
+
+            if(status !== 'Rejected') runningTotal += amount;
+            
+            const detailBtn = `<button class="btn-action" style="background:#3498db" title="Details" onclick="window.showExpenseDetails('${e.id}')"><i class="fas fa-info-circle"></i></button>`;
+            
+            tbody.append(`<tr>
+                <td data-label="Date">${e.date}</td>
+                <td data-label="Purpose"><strong>${e.expenseFor}</strong><br><small style="color:#94a3b8">${e.category}</small></td>
+                <td data-label="Amount"><strong>৳${amount.toFixed(2)}</strong></td>
+                <td data-label="Status"><span class="status-pill status-${status.toLowerCase()}">${status}</span></td>
+                <td data-label="By">${name}</td>
+                <td data-label="Action By"><small>${e.approvedBy || '-'}</small></td>
+                <td data-label="Action" style="text-align:right"><div style="display:flex; gap:4px; justify-content:flex-end;">${detailBtn}${editAction}${grantDenyActions}</div></td>
+            </tr>`);
+        });
+        
+        // Render Matrix to Modal
+        const matrixBody = $('#nameBreakdownTable tbody').empty();
+        const fmt = (v) => v === 0 ? '-' : '৳' + v.toLocaleString('en-US', {minimumFractionDigits: 2});
+        
+        Object.keys(matrix).sort().forEach(name => {
+            const m = matrix[name];
+            const rowTotal = m.Approved + m.Pending + m.Rejected;
+            matrixBody.append(`<tr>
+                <td style="font-weight:600">${name}</td>
+                <td class="val" style="color:#166534">${fmt(m.Approved)}</td>
+                <td class="val" style="color:#92400e">${fmt(m.Pending)}</td>
+                <td class="val" style="color:#991b1b">${fmt(m.Rejected)}</td>
+                <td class="val total-val">${fmt(rowTotal)}</td>
+            </tr>`);
+        });
+
+        $('#filteredTotal').text(runningTotal.toLocaleString('en-US', {minimumFractionDigits: 2}) + " BDT");
+    };
+
+    window.editExpense = function(id) {
+        const exp = pAllExpenses.find(e => e.id === id);
+        if(exp) window.toggleExpModal(true, exp);
+    };
+
+    window.deleteExpenseEntry = function(id) {
+        if(!confirm("Are you sure you want to permanently delete this expense?")) return;
+        google.script.run.withSuccessHandler(function(res) {
+            if(res && res.success) {
+                pAllExpenses = res.updatedList;
+                window.filterAndRenderExpenses();
+            } else {
+                alert("Error: " + res.message);
+            }
+        }).deleteExpense(id);
+    };
+
+    window.showExpenseDetails = function(id) {
+        const exp = pAllExpenses.find(e => e.id === id);
+        if(exp) {
+            alert(`Expense Details (ID: ${exp.id})\n\nPurpose: ${exp.expenseFor}\nCategory: ${exp.category}\nAmount: ৳${exp.amount}\nSubmitted By: ${exp.submittedBy}\n\nNote: ${exp.note || 'No additional notes'}`);
+        }
+    };
+
+    window.parseSheetDate = function(d) { 
+        if(!d) return new Date(0); 
+        if(d instanceof Date) return d; 
+        if(typeof d !== 'string') d = String(d);
+        const p = d.split('-'); 
+        if(p.length===3) { 
+            const m = {'Jan':0,'Feb':1,'Mar':2,'Apr':3,'May':4,'Jun':5,'Jul':6,'Aug':7,'Sep':8,'Oct':9,'Nov':10,'Dec':11}; 
+            if (m.hasOwnProperty(p[1])) {
+                return new Date(parseInt(p[2])+2000, m[p[1]], parseInt(p[0])); 
+            }
+        } 
+        const parsed = new Date(d);
+        return isNaN(parsed.getTime()) ? new Date(0) : parsed;
+    };
+
+    window.handleExpenseSubmit = function() {
+        const editId = $('#editExpId').val();
+        const btn = $('#submitExpBtn'), data = { 
+            id: editId,
+            date: $('#expDate').val(), 
+            category: $('#expCategory').val(), 
+            expenseFor: $('#expFor').val(), 
+            amount: $('#expAmount').val(), 
+            note: $('#expNote').val(), 
+            submittedBy: window.USER_NAME_EXP 
+        };
+        
+        if(!data.date || !data.amount || !data.expenseFor) return alert("Fill fields.");
+        btn.prop('disabled', true).text("...");
+        
+        const action = editId ? 'updateExpense' : 'submitExpense';
+        
+        google.script.run.withSuccessHandler(function(res) {
+            btn.prop('disabled', false).text("Submit");
+            if(res && res.success) { 
+                window.toggleExpModal(false); 
+                pAllExpenses = res.updatedList; 
+                window.filterAndRenderExpenses(); 
+            } else {
+                alert("Error: " + res.message);
+            }
+        })[action](data);
+    };
+
+    window.updateExpStatus = function(id, status, btn) {
+        $(btn).parent().find('button').prop('disabled', true).text("...");
+        google.script.run.withSuccessHandler(function() { window.loadExpenses(); }).updateExpenseStatus(id, status, window.USER_NAME_EXP);
+    };
+
+    window.printReport = function() {
+        localStorage.setItem('temp_expense_report', JSON.stringify({ data: pFilteredSet, total: $('#filteredTotal').text(), user: window.USER_NAME_EXP, searchQuery: "Filtered View", startDate: "Active", endDate: "Active" }));
+        window.open("<?= scriptUrl ?>?page=expense_report", "_blank");
+    };
+
+    window.initExpenses();
+</script>
+</body>
+</html>

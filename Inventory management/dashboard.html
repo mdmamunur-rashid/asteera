@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        .profit-math-table td { padding: 12px 15px; border-bottom: 1px solid #f1f5f9; }
+        .math-label { color: #64748b; font-weight: 500; font-size: 14px; }
+        .math-value { text-align: right; font-weight: 700; font-family: 'Inter', sans-serif; }
+        .math-operator { color: #94a3b8; font-weight: bold; margin-right: 8px; }
+        .result-row { background: #f8fafc; border-top: 2px solid #e2e8f0 !important; }
+        .text-profit { color: #10b981; }
+        .text-loss { color: #ef4444; }
+    </style>
+</head>
+<body>
+<div class="container-fluid p-4">
+    <div class="header mb-4 d-flex justify-content-between align-items-center flex-wrap gap-3">
+        <div>
+            <h2 class="fw-bold text-dark mb-1">Business Analytics</h2>
+            <p class="text-muted mb-0">Financial summary & inventory health status.</p>
+        </div>
+        <div class="d-flex align-items-center gap-2 bg-white p-2 rounded-3 shadow-sm">
+            <div class="small fw-bold text-muted px-2 text-uppercase" style="font-size: 11px; letter-spacing: 0.5px;">Filter Range</div>
+            <input type="date" id="dashStart" class="form-control form-control-sm border-0 bg-light" style="width:135px; font-weight: 600;">
+            <span class="text-muted small">to</span>
+            <input type="date" id="dashEnd" class="form-control form-control-sm border-0 bg-light" style="width:135px; font-weight: 600;">
+            <button class="btn btn-sm btn-primary px-3 fw-bold" onclick="refreshDashboard()" style="border-radius: 8px;">Update</button>
+        </div>
+    </div>
+
+    <!-- Main Stats Grid -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm p-3" style="border-radius: 16px; border-left: 5px solid #006666;">
+                <div class="text-muted small text-uppercase fw-bold mb-2">Total Sales (Net)</div>
+                <div id="stat-sales" class="h3 fw-bold mb-0">0.00</div>
+                <div class="small text-muted mt-1">Excl. Returns</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm p-3" style="border-radius: 16px; border-left: 5px solid #3b82f6;">
+                <div class="text-muted small text-uppercase fw-bold mb-2">Stock Value</div>
+                <div id="stat-stock-value" class="h3 fw-bold mb-0">0.00</div>
+                <div class="small text-muted mt-1">At Purchase Price</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm p-3" style="border-radius: 16px; border-left: 5px solid #f59e0b;">
+                <div class="text-muted small text-uppercase fw-bold mb-2">Pending Invoices</div>
+                <div id="stat-pending" class="h3 fw-bold mb-0">0</div>
+                <div class="small text-muted mt-1">Ready to Bill</div>
+            </div>
+        </div>
+        <div class="col-md-3 admin-only" style="display:none;">
+            <div class="card border-0 shadow-sm p-3" style="border-radius: 16px; border-left: 5px solid #ef4444;">
+                <div class="text-muted small text-uppercase fw-bold mb-2">Profit / Loss</div>
+                <div id="stat-profit-loss" class="h3 fw-bold mb-0">0.00</div>
+                <div class="small text-muted mt-1" id="profit-label">Net Performance</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Financial Breakdown (The "Math" Table) -->
+        <div class="col-lg-7 admin-only" style="display:none;">
+            <div class="card border-0 shadow-sm" style="border-radius: 20px; overflow: hidden;">
+                <div class="card-header bg-white p-4 border-0">
+                    <h5 class="fw-bold mb-0"><i class="fas fa-calculator me-2 text-primary"></i>Financial Breakdown</h5>
+                </div>
+                <div class="card-body p-0">
+                    <table class="w-100 profit-math-table">
+                        <tr>
+                            <td class="math-label">Total Net Sales Value</td>
+                            <td class="math-value" id="math-sales">৳0.00</td>
+                        </tr>
+                        <tr>
+                            <td class="math-label"><span class="math-operator">−</span> Cost of Goods Sold (Purch. Price)</td>
+                            <td class="math-value text-danger" id="math-cogs">৳0.00</td>
+                        </tr>
+                        <tr>
+                            <td class="math-label"><span class="math-operator">−</span> Total Business Expenses</td>
+                            <td class="math-value text-danger" id="math-expenses">৳0.00</td>
+                        </tr>
+                        <tr class="result-row">
+                            <td class="fw-bold" style="font-size: 16px;">Net Profit / Loss</td>
+                            <td class="math-value" style="font-size: 20px;" id="math-total">৳0.00</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stock Alerts -->
+        <div class="col-lg-5" id="stock-alerts-col">
+            <div class="card border-0 shadow-sm" style="border-radius: 20px;">
+                <div class="card-header bg-white p-4 border-0 d-flex justify-content-between align-items-center">
+                    <h5 class="fw-bold mb-0"><i class="fas fa-box-open me-2 text-danger"></i>Low Stock</h5>
+                    <span class="badge bg-danger rounded-pill" id="low-stock-count">0</span>
+                </div>
+                <div class="card-body p-0 border-top">
+                    <div style="max-height: 300px; overflow-y: auto;">
+                        <table class="table table-hover mb-0" id="lowStockTable">
+                            <thead class="bg-light">
+                                <tr class="small text-muted">
+                                    <th class="ps-4">SKU</th>
+                                    <th>Product</th>
+                                    <th class="text-end pe-4">Qty</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function refreshDashboard() {
+        const start = $('#dashStart').val();
+        const end = $('#dashEnd').val();
+        initDashboard(start, end);
+    }
+
+    function initDashboard(startDate = "", endDate = "") {
+        const isAdmin = "<?= userRole ?>".toLowerCase() === 'admin';
+        if (isAdmin) {
+            $('.admin-only').show();
+        } else {
+            // Make Stock Alerts full width if math table is hidden
+            $('#stock-alerts-col').removeClass('col-lg-5').addClass('col-lg-12');
+        }
+
+        console.log("Fetching Smart Dashboard Data for range:", startDate, "to", endDate);
+        google.script.run
+          .withSuccessHandler(data => {
+            const fmt = (num) => parseFloat(num).toLocaleString('en-US', {minimumFractionDigits: 2});
+            
+            // Top Cards
+            $('#stat-sales').text('৳' + fmt(data.totalSalesValue));
+            $('#stat-stock-value').text('৳' + fmt(data.stockValue));
+            $('#stat-pending').text(data.pendingInvoices);
+            
+            const pl = data.profitLoss;
+            $('#stat-profit-loss').text('৳' + fmt(pl)).attr('class', 'h3 fw-bold mb-0 ' + (pl >= 0 ? 'text-profit' : 'text-loss'));
+            $('#profit-label').text(pl >= 0 ? 'Net Profit' : 'Net Loss');
+
+            // Math Table
+            $('#math-sales').text('৳' + fmt(data.totalSalesValue));
+            $('#math-cogs').text('৳' + fmt(data.totalPurchaseValue));
+            $('#math-expenses').text('৳' + fmt(data.totalExpenses));
+            $('#math-total').text('৳' + fmt(pl)).attr('class', 'math-value ' + (pl >= 0 ? 'text-profit' : 'text-loss'));
+
+            // Low Stock
+            $('#low-stock-count').text(data.lowStockCount);
+            const tbody = $('#lowStockTable tbody').empty();
+            if (data.lowStockItems.length === 0) {
+                tbody.append('<tr><td colspan="3" class="text-center py-4 text-muted">Stock levels healthy.</td></tr>');
+            } else {
+                data.lowStockItems.forEach(item => {
+                    tbody.append(`<tr><td class="ps-4"><strong>${item.sku}</strong></td><td>${item.name}</td><td class="text-end pe-4 text-danger fw-bold">${item.qty}</td></tr>`);
+                });
+            }
+          })
+          .getDashboardData(startDate, endDate);
+    }
+
+    $(document).ready(function() {
+        // Set default dates to current month
+        const now = new Date();
+        const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+        const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+        $('#dashStart').val(firstDay);
+        $('#dashEnd').val(lastDay);
+        
+        initDashboard(firstDay, lastDay);
+    });
+</script>
+</body>
+</html>

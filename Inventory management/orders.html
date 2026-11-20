@@ -1,0 +1,366 @@
+<div class="container-fluid p-4 d-flex flex-column" style="min-height: 100%;">
+    <!-- Header with Smart Greeting -->
+    <div class="row mb-4 align-items-center flex-shrink-0">
+        <div class="col-md-6">
+            <h2 class="fw-bold text-dark mb-1"><i class="fas fa-rocket me-2" style="color: #006666;"></i>Order Hub</h2>
+            <p class="text-muted mb-0">Smart processing & courier synchronization.</p>
+        </div>
+        <div class="col-md-6 text-md-end mt-3 mt-md-0">
+            <button onclick="openPathaoSettings()" class="btn btn-white shadow-sm border me-2" style="border-radius: 12px; font-weight: 600;">
+                <i class="fas fa-cog me-2 text-warning"></i>Pathao Settings
+            </button>
+            <button onclick="openSteadfastSettings()" class="btn btn-white shadow-sm border me-2" style="border-radius: 12px; font-weight: 600;">
+                <i class="fas fa-cog me-2 text-success"></i>Steadfast Settings
+            </button>
+            <button onclick="refreshStats()" class="btn btn-white shadow-sm border" style="border-radius: 12px; font-weight: 600;">
+                <i class="fas fa-sync-alt me-2 text-primary" id="refreshIcon"></i>Refresh Dashboard
+            </button>
+        </div>
+    </div>
+
+    <!-- Pathao Settings Modal -->
+    <div class="modal fade" id="pathaoSettingsModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 24px;">
+                <div class="modal-header border-0 p-4 pb-0">
+                    <h5 class="fw-bold"><i class="fas fa-truck-loading me-2 text-warning"></i>Pathao API Configuration</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <form id="pathaoConfigForm">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold text-muted">Client ID</label>
+                                <input type="text" class="form-control" id="pathaoClientId" required style="border-radius: 12px; padding: 12px;">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold text-muted">Client Secret</label>
+                                <input type="password" class="form-control" id="pathaoClientSecret" required style="border-radius: 12px; padding: 12px;">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold text-muted">Username</label>
+                                <input type="text" class="form-control" id="pathaoUsername" required style="border-radius: 12px; padding: 12px;">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold text-muted">Password</label>
+                                <input type="password" class="form-control" id="pathaoPassword" required style="border-radius: 12px; padding: 12px;">
+                            </div>
+                            <div class="col-md-8">
+                                <label class="form-label small fw-bold text-muted">Base URL</label>
+                                <input type="url" class="form-control" id="pathaoBaseUrl" placeholder="https://api.pathao.com" required style="border-radius: 12px; padding: 12px;">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold text-muted">Store ID</label>
+                                <input type="text" class="form-control" id="pathaoStoreId" required style="border-radius: 12px; padding: 12px;">
+                            </div>
+                        </div>
+                        <div class="mt-4">
+                            <button type="submit" class="btn btn-warning w-100 py-3 fw-bold text-white shadow-sm" style="background: #ff8c00; border: none; border-radius: 14px;">
+                                Save Configuration
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Steadfast Settings Modal -->
+    <div class="modal fade" id="steadfastSettingsModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 24px;">
+                <div class="modal-header border-0 p-4 pb-0">
+                    <h5 class="fw-bold"><i class="fas fa-shipping-fast me-2 text-success"></i>Steadfast API Configuration</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <form id="steadfastConfigForm">
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold text-muted">API Key</label>
+                            <input type="text" class="form-control" id="steadfastApiKey" required style="border-radius: 12px; padding: 12px;">
+                        </div>
+                        <div class="mb-4">
+                            <label class="form-label small fw-bold text-muted">Secret Key</label>
+                            <input type="password" class="form-control" id="steadfastSecretKey" required style="border-radius: 12px; padding: 12px;">
+                        </div>
+                        <button type="submit" class="btn btn-success w-100 py-3 fw-bold text-white shadow-sm" style="border-radius: 14px;">
+                            Save Configuration
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Smart Statistics Bar -->
+    <div class="row g-3 mb-4 flex-shrink-0">
+        <div class="col-md-3">
+            <div class="stat-card p-4 shadow-sm border-0 d-flex align-items-center" style="background: #ffffff; border-radius: 20px;">
+                <div class="stat-icon me-3" style="background: #e0f2f1; color: #006666; width: 60px; height: 60px; border-radius: 15px; display: flex; align-items: center; justify-content: center;">
+                    <i class="fas fa-hourglass-half fa-2x"></i>
+                </div>
+                <div>
+                    <h3 class="fw-bold mb-0" id="statReadyToBill">0</h3>
+                    <small class="text-muted text-uppercase fw-bold" style="font-size: 11px; letter-spacing: 1px;">Ready to Bill</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card p-4 shadow-sm border-0 d-flex align-items-center" style="background: #ffffff; border-radius: 20px;">
+                <div class="stat-icon me-3" style="background: #fff3e0; color: #ff8c00; width: 60px; height: 60px; border-radius: 15px; display: flex; align-items: center; justify-content: center;">
+                    <i class="fas fa-truck-loading fa-2x"></i>
+                </div>
+                <div>
+                    <h3 class="fw-bold mb-0" id="statPendingPathao">0</h3>
+                    <small class="text-muted text-uppercase fw-bold" style="font-size: 11px; letter-spacing: 1px;">Pending Pathao</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card p-4 shadow-sm border-0 d-flex align-items-center" style="background: #ffffff; border-radius: 20px;">
+                <div class="stat-icon me-3" style="background: #e8f5e9; color: #2e7d32; width: 60px; height: 60px; border-radius: 15px; display: flex; align-items: center; justify-content: center;">
+                    <i class="fas fa-shipping-fast fa-2x"></i>
+                </div>
+                <div>
+                    <h3 class="fw-bold mb-0" id="statPendingSteadfast">0</h3>
+                    <small class="text-muted text-uppercase fw-bold" style="font-size: 11px; letter-spacing: 1px;">Pending Steadfast</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card p-4 shadow-sm border-0 d-flex align-items-center" style="background: #ffffff; border-radius: 20px;">
+                <div class="stat-icon me-3" style="background: #e3f2fd; color: #0277bd; width: 60px; height: 60px; border-radius: 15px; display: flex; align-items: center; justify-content: center;">
+                    <i class="fas fa-check-double fa-2x"></i>
+                </div>
+                <div>
+                    <h3 class="fw-bold mb-0" id="statTotalToday">0</h3>
+                    <small class="text-muted text-uppercase fw-bold" style="font-size: 11px; letter-spacing: 1px;">Total Today</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Actions and Log Row -->
+    <div class="row g-4 flex-grow-1">
+        <!-- Action Column -->
+        <div class="col-lg-7 d-flex flex-column gap-3">
+            <div class="card border-0 shadow-sm action-card" style="border-radius: 24px;">
+                <div class="card-body p-4 d-flex flex-column">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <div>
+                            <h5 class="fw-bold mb-1">Billing Engine</h5>
+                            <p class="text-muted small mb-0">Convert queries to sales records.</p>
+                        </div>
+                        <span class="badge rounded-pill" style="background: #e0f2f1; color: #006666; padding: 8px 16px;" id="badgeReadyToBill">0 items</span>
+                    </div>
+                    <button id="btnGenerateBills" class="btn btn-dark w-100 py-3 fw-bold" style="background: #006666; border: none; border-radius: 14px; font-size: 16px;">
+                        <span id="btnTextBills">Initialize Billing Engine</span>
+                        <i class="fas fa-arrow-right ms-2" id="iconBills"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="card border-0 shadow-sm action-card" style="border-radius: 24px;">
+                <div class="card-body p-4 d-flex flex-column">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <div>
+                            <h5 class="fw-bold mb-1">Courier Synchronization</h5>
+                            <p class="text-muted small mb-0">Bulk book Pathao & Steadfast shipments.</p>
+                        </div>
+                        <span class="badge rounded-pill" style="background: #f1f5f9; color: #475569; padding: 8px 16px;" id="badgePendingCourier">0 items</span>
+                    </div>
+                    <button id="btnSyncCouriers" class="btn btn-primary w-100 py-3 fw-bold text-white" style="background: #1e293b; border: none; border-radius: 14px; font-size: 16px;">
+                        <span id="btnTextSync">Sync All Couriers</span>
+                        <i class="fas fa-truck-moving ms-2" id="iconSync"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Log Column -->
+        <div class="col-lg-5">
+            <div class="card border-0 shadow-sm h-100 d-flex flex-column" style="border-radius: 24px;">
+                <div class="card-header bg-white border-0 p-4 d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0 fw-bold text-uppercase" style="font-size: 12px; letter-spacing: 1.5px; color: #64748b;"><i class="fas fa-terminal me-2"></i>Activity Monitor</h6>
+                    <button onclick="$('#actionLog').html('')" class="btn btn-sm btn-light rounded-circle" title="Clear Log"><i class="fas fa-trash-alt text-muted"></i></button>
+                </div>
+                <div class="card-body p-0 flex-grow-1 border-top">
+                    <div id="actionLog" class="p-4" style="height: 480px; overflow-y: auto; background: #ffffff; border-radius: 0 0 24px 24px;">
+                        <div class="text-center py-5 opacity-25">
+                            <i class="fas fa-stream fa-3x mb-3"></i>
+                            <p>System Ready</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .action-card { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+    .action-card:hover { transform: translateY(-5px); box-shadow: 0 10px 25px rgba(0,0,0,0.05) !important; }
+    .btn:active { transform: scale(0.98); }
+    .stat-card { transition: 0.3s; }
+    .stat-card:hover { transform: scale(1.02); }
+    
+    #actionLog::-webkit-scrollbar { width: 6px; }
+    #actionLog::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+    
+    .log-entry { padding: 10px 15px; border-radius: 8px; margin-bottom: 8px; border-left: 3px solid transparent; animation: slideIn 0.3s ease-out; }
+    .log-info { background: #f8fafc; border-left-color: #cbd5e1; }
+    .log-success { background: #f0fdf4; border-left-color: #22c55e; color: #166534; }
+    .log-error { background: #fef2f2; border-left-color: #ef4444; color: #991b1b; }
+    
+    @keyframes slideIn { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
+    
+    .fa-spin-slow { animation: fa-spin 2s linear infinite; }
+</style>
+
+<script>
+    function log(msg, type = 'info') {
+        const icon = type === 'success' ? 'fa-check' : (type === 'error' ? 'fa-exclamation-triangle' : 'fa-info-circle');
+        const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        
+        if ($('#actionLog .text-center').length) $('#actionLog').html('');
+        
+        $('#actionLog').prepend(`
+            <div class="log-entry log-${type}">
+                <div class="d-flex justify-content-between">
+                    <span><i class="fas ${icon} me-2"></i>${msg}</span>
+                    <small class="text-muted opacity-50">${time}</small>
+                </div>
+            </div>
+        `);
+    }
+
+    function refreshStats() {
+        $('#refreshIcon').addClass('fa-spin');
+        google.script.run.withSuccessHandler(stats => {
+            $('#refreshIcon').removeClass('fa-spin');
+            
+            // Stats bar numbers
+            $('#statReadyToBill').text(stats.readyToBill);
+            $('#statPendingPathao').text(stats.pendingPathao);
+            $('#statPendingSteadfast').text(stats.pendingSteadfast);
+            $('#statTotalToday').text(stats.totalToday);
+            
+            // Badges
+            $('#badgeReadyToBill').text(stats.readyToBill + ' items');
+            const totalCourier = (parseInt(stats.pendingPathao) || 0) + (parseInt(stats.pendingSteadfast) || 0);
+            $('#badgePendingCourier').text(totalCourier + ' items');
+        }).getOrderStats();
+    }
+
+    $('#btnGenerateBills').click(function() {
+        const btn = $(this);
+        btn.prop('disabled', true).css('opacity', '0.7');
+        $('#iconBills').attr('class', 'fas fa-spinner fa-spin ms-2');
+        $('#btnTextBills').text('Processing...');
+        log("Initializing billing engine...", 'info');
+
+        google.script.run.withSuccessHandler(res => {
+            btn.prop('disabled', false).css('opacity', '1');
+            $('#iconBills').attr('class', 'fas fa-arrow-right ms-2');
+            $('#btnTextBills').text('Initialize Billing Engine');
+            
+            if (res.success) {
+                log(res.message, 'success');
+                if (res.skipped && res.skipped.length > 0) {
+                    log("Skipped: " + res.skipped.join(", "), 'error');
+                }
+            } else {
+                log(res.message, 'error');
+            }
+            refreshStats();
+        }).erpGenerateInvoices();
+    });
+
+    $('#btnSyncCouriers').click(function() {
+        const btn = $(this);
+        btn.prop('disabled', true).css('opacity', '0.7');
+        $('#iconSync').attr('class', 'fas fa-spinner fa-spin ms-2');
+        $('#btnTextSync').text('Syncing Couriers...');
+        log("Connecting to Courier APIs...", 'info');
+
+        google.script.run.withSuccessHandler(res => {
+            btn.prop('disabled', false).css('opacity', '1');
+            $('#iconSync').attr('class', 'fas fa-truck-moving ms-2');
+            $('#btnTextSync').text('Sync All Couriers');
+            
+            log(res.message, res.success ? 'success' : 'error');
+            refreshStats();
+        }).erpSyncAllCouriers();
+    });
+
+    // Auto load
+    $(document).ready(refreshStats);
+
+    function openPathaoSettings() {
+        google.script.run.withSuccessHandler(config => {
+            if (config) {
+                $('#pathaoClientId').val(config.clientId || '');
+                $('#pathaoClientSecret').val(config.clientSecret || '');
+                $('#pathaoUsername').val(config.username || '');
+                $('#pathaoPassword').val(config.password || '');
+                $('#pathaoBaseUrl').val(config.baseUrl || '');
+                $('#pathaoStoreId').val(config.pathaoStoreId || '');
+            }
+            const modal = new bootstrap.Modal(document.getElementById('pathaoSettingsModal'));
+            modal.show();
+        }).getPathaoStoredConfig();
+    }
+
+    $('#pathaoConfigForm').submit(function(e) {
+        e.preventDefault();
+        const btn = $(this).find('button[type="submit"]');
+        btn.prop('disabled', true).text('Saving...');
+        
+        const config = {
+            clientId: $('#pathaoClientId').val(),
+            clientSecret: $('#pathaoClientSecret').val(),
+            username: $('#pathaoUsername').val(),
+            password: $('#pathaoPassword').val(),
+            baseUrl: $('#pathaoBaseUrl').val(),
+            pathaoStoreId: $('#pathaoStoreId').val()
+        };
+
+        google.script.run.withSuccessHandler(res => {
+            btn.prop('disabled', false).text('Save Configuration');
+            if (res.success) {
+                log("Pathao configuration saved successfully.", 'success');
+                bootstrap.Modal.getInstance(document.getElementById('pathaoSettingsModal')).hide();
+            } else {
+                log("Error saving Pathao config: " + res.message, 'error');
+            }
+        }).savePathaoConfig(config);
+    });
+
+    function openSteadfastSettings() {
+        google.script.run.withSuccessHandler(config => {
+            if (config) {
+                $('#steadfastApiKey').val(config.apiKey || '');
+                $('#steadfastSecretKey').val(config.secretKey || '');
+            }
+            const modal = new bootstrap.Modal(document.getElementById('steadfastSettingsModal'));
+            modal.show();
+        }).getSteadfastConfig();
+    }
+
+    $('#steadfastConfigForm').submit(function(e) {
+        e.preventDefault();
+        const btn = $(this).find('button[type="submit"]');
+        btn.prop('disabled', true).text('Saving...');
+        
+        const apiKey = $('#steadfastApiKey').val();
+        const secretKey = $('#steadfastSecretKey').val();
+
+        google.script.run.withSuccessHandler(res => {
+            btn.prop('disabled', false).text('Save Configuration');
+            if (res) {
+                log("Steadfast configuration saved successfully.", 'success');
+                bootstrap.Modal.getInstance(document.getElementById('steadfastSettingsModal')).hide();
+            }
+        }).saveSteadfastConfig(apiKey, secretKey);
+    });
+</script>

@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <base target="_top">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .container { padding: 20px; font-family: 'Segoe UI', sans-serif; }
+        .header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .btn { padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; color: white; background-color: #008080; font-weight: bold; }
+        .btn-bulk { background-color: #ff8c00; }
+        .btn-sm { padding: 5px 10px; font-size: 0.8rem; }
+
+        /* Enhanced Controls Bar */
+        .controls-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 15px; background: #f1f3f4; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
+        .search-box { flex: 2; min-width: 250px; position: relative; }
+        .search-box input { width: 100%; padding: 10px 15px 10px 35px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
+        .search-box i { position: absolute; left: 12px; top: 12px; color: #999; }
+
+        .date-filter { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+        .date-filter input { padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
+
+        .switch-container { display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 600; white-space: nowrap; }
+
+        .data-table { width: 100%; border-collapse: collapse; background: white; }
+        .data-table th, .data-table td { padding: 12px; border-bottom: 1px solid #eee; text-align: left; }
+        .data-table th { background: #f8f9fa; font-weight: 600; color: #555; }
+        .sale-row:hover { background-color: #f9f9f9; }
+        .printed-badge { background: #e0f2f1; color: #008080; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: bold; }
+        .pending-badge { background: #fff3e0; color: #e67e22; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: bold; }
+        .processing-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.8); z-index: 2000; justify-content: center; align-items: center; }
+        .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #008080; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+
+<div class="container">
+    <div class="header-row">
+        <div>
+            <h2>Sales & Invoice Management</h2>
+            <div style="color:#666; font-size:0.8rem;">Connected to Order Management Database</div>
+        </div>
+        <div style="display:flex; gap:10px;">
+            <button id="bulkSelectedBtn" class="btn" style="background-color: #27ae60; display:none;" onclick="processBulkSelected()">
+                <i class="fas fa-check-double"></i> PRINT SELECTED (<span id="selectedCount">0</span>)
+            </button>
+            <button id="bulkBtn" class="btn btn-bulk" onclick="processBulk()">
+                <i class="fas fa-print"></i> BULK PRINT PENDING
+            </button>
+        </div>
+    </div>
+
+    <!-- Brand Selector Card -->
+    <div style="background: white; border-radius: 12px; padding: 15px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border-left: 4px solid #008080;">
+        <div style="display: flex; align-items: center; gap: 20px; flex-wrap: wrap;">
+            <div style="flex: 1; min-width: 200px;">
+                <label style="display: block; font-weight: 600; color: #555; margin-bottom: 8px; font-size: 0.9rem;">SELECT BRAND FOR PRINTING</label>
+                <select id="brandSelector" onchange="onBrandSelected()" style="width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px; font-weight: 500; background: white; cursor: pointer;">
+                    <option value="">Default (Use Order Brand)</option>
+                </select>
+            </div>
+            <div id="brandDetailsContainer" style="flex: 2; min-width: 300px; display: flex; gap: 15px; align-items: flex-start;">
+                <img id="brandLogo" src="" style="max-width: 80px; max-height: 80px; border-radius: 8px; display: none; object-fit: contain;">
+                <div style="flex: 1;">
+                    <div id="brandAddress" style="color: #666; font-size: 0.85rem; line-height: 1.4;"></div>
+                    <div id="brandPhone" style="color: #008080; font-weight: 600; margin-top: 6px;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="controls-bar">
+        <div class="search-box">
+            <i class="fas fa-search"></i>
+            <input type="text" id="searchInput" placeholder="Search Invoice Num, Name, Phone, or SKU...">
+        </div>
+
+        <div class="date-filter">
+            <span>From:</span>
+            <input type="date" id="startDate">
+            <span>To:</span>
+            <input type="date" id="endDate">
+        </div>
+
+        <div class="switch-container">
+            <span>Show Printed History</span>
+            <input type="checkbox" id="showPrintedToggle" style="width:20px; height:20px; cursor:pointer;">
+        </div>
+    </div>
+
+    <table class="data-table" id="salesTable">
+        <thead>
+            <tr>
+                <th style="width:30px;"><input type="checkbox" id="selectAll" onclick="toggleSelectAll(this)"></th>
+                <th>Date</th>
+                <th>Image</th>
+                <th>Invoice Num</th>
+                <th>Customer</th>
+                <th>Items Count</th>
+                <th>Total Price</th>
+                <th>Status</th>
+                <th style="text-align:right">Action</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</div>
+
+<div id="processingOverlay" class="processing-overlay"><div class="spinner"></div></div>
+
+<script>
+    let allSales = [];
+    let selectedInvoices = new Set();
+
+    let allBrandings = [];
+    let selectedBrand = null;
+
+    $(document).ready(function() {
+        loadBrandings();
+        loadSales();
+
+        // Combined handler for all filters
+        $('#searchInput, #showPrintedToggle, #startDate, #endDate').on('input change', function() {
+            filterAndRender();
+        });
+
+        // Refresh when returning to this tab
+        window.onfocus = function() {
+            loadSales();
+        };
+    });
+
+    function loadBrandings() {
+        google.script.run
+          .withSuccessHandler(data => {
+            allBrandings = data;
+            populateBrandDropdown();
+          })
+          .getBrandings();
+    }
+
+    function populateBrandDropdown() {
+        const select = $('#brandSelector');
+        allBrandings.forEach(brand => {
+            select.append(`<option value="${brand.name}">${brand.name}</option>`);
+        });
+    }
+
+    function onBrandSelected() {
+        const brandName = $('#brandSelector').val();
+        selectedBrand = brandName ? allBrandings.find(b => b.name === brandName) : null;
+
+        if (selectedBrand) {
+            $('#brandLogo').attr('src', selectedBrand.logo).show();
+            $('#brandAddress').text(selectedBrand.address);
+            $('#brandPhone').text('📱 ' + selectedBrand.phone);
+        } else {
+            $('#brandLogo').hide();
+            $('#brandAddress').text('');
+            $('#brandPhone').text('');
+        }
+    }
+
+    function toggleSelectAll(master) {
+        $('.row-checkbox').each(function() {
+            this.checked = master.checked;
+            updateSelection(this.value, this.checked);
+        });
+        renderBulkBtn();
+    }
+
+    function updateSelection(id, checked) {
+        if (checked) selectedInvoices.add(id);
+        else selectedInvoices.delete(id);
+        renderBulkBtn();
+    }
+
+    function renderBulkBtn() {
+        const count = selectedInvoices.size;
+        $('#selectedCount').text(count);
+        if (count > 0) $('#bulkSelectedBtn').show();
+        else $('#bulkSelectedBtn').hide();
+    }
+
+    function showProcessing() { $('#processingOverlay').css('display', 'flex'); }
+    function hideProcessing() { $('#processingOverlay').hide(); }
+
+    function loadSales() {
+        showProcessing();
+        google.script.run
+          .withSuccessHandler(data => {
+            allSales = data;
+            filterAndRender();
+            hideProcessing();
+          })
+          .withFailureHandler(err => {
+            hideProcessing();
+            alert("Error: " + err.message);
+          })
+          .getSalesList();
+    }
+
+    function filterAndRender() {
+        const query = $('#searchInput').val().toLowerCase();
+        const showPrinted = $('#showPrintedToggle').is(':checked');
+        const startStr = $('#startDate').val();
+        const endStr = $('#endDate').val();
+
+        const start = startStr ? new Date(startStr + 'T00:00:00') : null;
+        const end = endStr ? new Date(endStr + 'T23:59:59') : null;
+
+        console.log("Filtering range:", startStr, "to", endStr);
+
+        const filtered = allSales.filter(s => {
+            if (!showPrinted && s.isPrinted) return false;
+
+            const saleDate = parseSheetDate(s.date);
+
+            if (start && saleDate < start) return false;
+            if (end && saleDate > end) return false;
+
+            if (!query) return true;
+            return s.invoiceNum.toLowerCase().includes(query) ||
+                   s.customerName.toLowerCase().includes(query) ||
+                   s.phone.toLowerCase().includes(query) ||
+                   s.items.some(item => item.sku.toLowerCase().includes(query) || item.name.toLowerCase().includes(query));
+        });
+
+        renderTable(filtered);
+    }
+
+    /**
+     * Converts "02-Mar-2026" into a valid Javascript Date object.
+     */
+    function parseSheetDate(dateStr) {
+        if (!dateStr) return new Date(0);
+
+        // Handle if dateStr is already a Date object (unlikely from JSON but good practice)
+        if (dateStr instanceof Date) return dateStr;
+
+        // format: 02-Mar-2026
+        const parts = dateStr.split('-');
+        if (parts.length === 3) {
+            const months = {
+                'jan':0, 'feb':1, 'mar':2, 'apr':3, 'may':4, 'jun':5,
+                'jul':6, 'aug':7, 'sep':8, 'oct':9, 'nov':10, 'dec':11
+            };
+            const day = parseInt(parts[0]);
+            const month = months[parts[1].toLowerCase()];
+            const year = parseInt(parts[2]);
+
+            if (!isNaN(day) && month !== undefined && !isNaN(year)) {
+                // Use local time construction
+                return new Date(year, month, day);
+            }
+        }
+
+        const fallback = new Date(dateStr);
+        return isNaN(fallback.getTime()) ? new Date(0) : fallback;
+    }
+
+    function renderTable(data) {
+        const tbody = $('#salesTable tbody').empty();
+        if(!data || data.length === 0) {
+            tbody.append('<tr><td colspan="9" style="text-align:center; padding:40px;">No matching sales found</td></tr>');
+            return;
+        }
+
+        data.forEach(s => {
+            const isChecked = selectedInvoices.has(s.invoiceNum) ? 'checked' : '';
+            const firstItemImage = s.items.length > 0 ? s.items[0].image : "";
+
+            tbody.append(`<tr class="sale-row">
+                <td data-label="Select"><input type="checkbox" class="row-checkbox" value="${s.invoiceNum}" ${isChecked} onchange="updateSelection('${s.invoiceNum}', this.checked)"></td>
+                <td data-label="Date">${s.date}</td>
+                <td data-label="Image">
+                    ${firstItemImage ? `<img src="${firstItemImage}" style="width:40px; height:40px; border-radius:6px; object-fit:cover; border:1px solid #eee;">` : '<div style="width:40px; height:40px; background:#f8f9fa; border-radius:6px; border:1px dashed #ddd;"></div>'}
+                </td>
+                <td data-label="Invoice Num"><strong>${s.invoiceNum}</strong></td>
+                <td data-label="Customer">${s.customerName}<br><small style="color:#888">${s.phone}</small></td>
+                <td data-label="Items"><span style="color:#008080">${s.items.length} Product(s)</span></td>
+                <td data-label="Total"><strong>${s.totalAmount.toFixed(2)}</strong></td>
+                <td data-label="Status">
+                    <span class="${s.isPrinted ? 'printed-badge' : 'pending-badge'}">
+                        <i class="fas ${s.isPrinted ? 'fa-check-circle' : 'fa-clock'}"></i>
+                        ${s.isPrinted ? 'PRINTED' : 'PENDING'}
+                    </span>
+                </td>
+                <td data-label="Action" style="text-align:right">
+                    <button class="btn btn-sm" onclick="printInvoice('${s.invoiceNum}', ${s.isPrinted})">
+                        <i class="fas fa-print"></i> ${s.isPrinted ? 'RE-PRINT' : 'PRINT'}
+                    </button>
+                </td>
+            </tr>`);
+        });
+    }
+
+    function printInvoice(invNum, alreadyPrinted) {
+        const width = 1000;
+        const height = 800;
+        const left = (screen.width / 2) - (width / 2);
+        const top = (screen.height / 2) - (height / 2);
+
+        let url = '<?= getScriptUrl() ?>?page=invoice&soId=' + invNum;
+        if (selectedBrand) {
+            url += '&forceBrand=' + encodeURIComponent(selectedBrand.name);
+        }
+
+        window.open(url, 'Invoice_' + invNum,
+            `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`);
+
+        if (!alreadyPrinted) {
+            google.script.run.withSuccessHandler(() => {
+                loadSales(); // Refresh the table
+            }).markInvoiceAsPrinted(invNum);
+        }
+    }
+
+    function processBulk() {
+        const width = 1100;
+        const height = 900;
+        const left = (screen.width / 2) - (width / 2);
+        const top = (screen.height / 2) - (height / 2);
+
+        let url = '<?= getScriptUrl() ?>?page=bulk_print&type=sales';
+        if (selectedBrand) {
+            url += '&forceBrand=' + encodeURIComponent(selectedBrand.name);
+        }
+
+        window.open(url, 'Bulk_Print_Sales',
+            `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`);
+    }
+
+    function processBulkSelected() {
+        const ids = Array.from(selectedInvoices).join(',');
+        const width = 1100;
+        const height = 900;
+        const left = (screen.width / 2) - (width / 2);
+        const top = (screen.height / 2) - (height / 2);
+
+        let url = '<?= getScriptUrl() ?>?page=bulk_print&type=sales&selectedIds=' + ids;
+        if (selectedBrand) {
+            url += '&forceBrand=' + encodeURIComponent(selectedBrand.name);
+        }
+
+        window.open(url, 'Bulk_Print_Selected',
+            `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`);
+
+        // Clear selection after opening
+        selectedInvoices.clear();
+        $('#selectAll').prop('checked', false);
+        renderBulkBtn();
+    }
+</script>
+</body>
+</html>

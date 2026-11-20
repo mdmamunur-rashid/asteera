@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root { --sidebar-width: 280px; --primary-teal: #005a5a; --accent-orange: #ff8c00; --bg-light: #f1f5f9; --mobile-nav-height: 70px; }
+        body { font-family: 'Inter', system-ui, -apple-system, sans-serif; margin: 0; display: flex; height: 100vh; background: var(--bg-light); overflow: hidden; color: #1e293b; }
+        
+        /* Premium Sidebar (Desktop) */
+        .sidebar { width: var(--sidebar-width); background: var(--primary-teal); color: white; display: flex; flex-direction: column; flex-shrink: 0; z-index: 100; box-shadow: 10px 0 30px rgba(0,0,0,0.05); }
+        .sidebar-header { padding: 30px 20px; text-align: center; }
+        .logo { width: 150px; height: auto; transition: 0.3s; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.2)); }
+        
+        .user-profile { padding: 20px; display: flex; align-items: center; gap: 15px; border-top: 1px solid rgba(255,255,255,0.05); border-bottom: 1px solid rgba(255,255,255,0.05); background: rgba(0,0,0,0.1); }
+        .user-photo { width: 45px; height: 48px; border-radius: 12px; border: 2px solid var(--accent-orange); object-fit: cover; }
+        .user-name { font-weight: 700; font-size: 14px; color: #ffffff; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .user-role { font-size: 10px; color: #94a3b8; text-transform: uppercase; letter-spacing: 1.2px; margin-top: 2px; display: block; }
+
+        .nav-menu { flex: 1; padding: 15px 0; overflow-y: auto; }
+        .nav-item { padding: 14px 25px; color: #cbd5e1; text-decoration: none; display: flex; align-items: center; gap: 15px; font-size: 15px; font-weight: 600; cursor: pointer; border-left: 4px solid transparent; transition: 0.2s; }
+        .nav-item i { font-size: 20px; width: 25px; text-align: center; }
+        .nav-item:hover { background: rgba(255,255,255,0.05); color: #ffffff; }
+        .nav-item.active { background: var(--accent-orange); color: white; border-left-color: #ffffff; box-shadow: 0 4px 12px rgba(255, 140, 0, 0.3); }
+        .nav-item.hidden { display: none !important; }
+
+        .logout-btn { padding: 20px 25px; color: #fca5a5; font-size: 14px; font-weight: 700; cursor: pointer; transition: 0.3s; }
+        .logout-btn:hover { background: #dc2626; color: white; }
+
+        /* Main Wrapper */
+        .main-wrapper { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+        .top-bar { 
+            height: 70px; 
+            background: #ffffff; 
+            border-bottom: 1px solid #e2e8f0;
+            display: flex; 
+            align-items: center; 
+            padding: 0 25px; 
+            justify-content: space-between; 
+            z-index: 90;
+        }
+        .brand-text { font-weight: 900; color: var(--primary-teal); font-size: 18px; }
+        .time-pill { font-size: 13px; font-weight: 700; color: #64748b; background: #f1f5f9; padding: 8px 15px; border-radius: 10px; }
+
+        .content-area { flex: 1; overflow-y: auto; background: var(--bg-light); padding-bottom: 20px; position: relative; }
+
+        /* Mobile Navigation (Hidden on Desktop) */
+        .mobile-nav { 
+            display: none; 
+            position: fixed; 
+            bottom: 0; 
+            left: 0; 
+            right: 0; 
+            height: var(--mobile-nav-height); 
+            background: #ffffff; 
+            border-top: 1px solid #e2e8f0; 
+            z-index: 1000; 
+            overflow-x: auto; 
+            overflow-y: hidden;
+            white-space: nowrap;
+            justify-content: flex-start; 
+            align-items: center; 
+            padding: 0 5px; 
+            box-shadow: 0 -5px 20px rgba(0,0,0,0.05); 
+            -webkit-overflow-scrolling: touch;
+        }
+        .mobile-nav::-webkit-scrollbar { display: none; }
+        
+        .mobile-nav-item { 
+            display: inline-flex; 
+            flex-direction: column; 
+            align-items: center; 
+            color: #64748b; 
+            text-decoration: none; 
+            font-size: 10px; 
+            font-weight: 700; 
+            text-transform: uppercase; 
+            letter-spacing: 0.5px; 
+            gap: 4px; 
+            flex: 0 0 75px; 
+            cursor: pointer; 
+            padding: 10px 0;
+        }
+        .mobile-nav-item i { font-size: 18px; }
+        .mobile-nav-item.active { color: var(--primary-teal); }
+        .mobile-nav-item.active i { transform: translateY(-2px); color: var(--accent-orange); transition: 0.2s; }
+        .mobile-nav-item.hidden { display: none !important; }
+
+        /* Mobile Adjustments */
+        @media (max-width: 992px) {
+            .sidebar { display: none !important; }
+            .mobile-nav { display: flex !important; }
+            .content-area { padding-bottom: calc(var(--mobile-nav-height) + 20px) !important; }
+            .top-bar { padding: 0 15px !important; height: 60px !important; }
+            .brand-text { font-size: 16px !important; }
+            .time-pill { display: none !important; }
+            .container-fluid, .container { padding: 10px !important; margin: 0 !important; width: 100% !important; max-width: 100% !important; }
+            
+            /* Responsive Utilities for all pages */
+            .card { border-radius: 12px !important; margin-bottom: 10px !important; }
+            
+            /* GLOBAL CARD VIEW FOR TABLES ON MOBILE */
+            table.data-table, 
+            table.data-table thead, 
+            table.data-table tbody, 
+            table.data-table th, 
+            table.data-table td, 
+            table.data-table tr { 
+                display: block !important; 
+                width: 100% !important;
+            }
+            
+            table.data-table thead tr { 
+                position: absolute !important; 
+                top: -9999px !important; 
+                left: -9999px !important; 
+            }
+            
+            table.data-table tr { 
+                background: #fff !important;
+                border: 1px solid #e2e8f0 !important; 
+                border-radius: 16px !important;
+                margin-bottom: 20px !important;
+                padding: 10px !important;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.08) !important;
+            }
+            
+            table.data-table td { 
+                border: none !important;
+                border-bottom: 1px solid #f1f5f9 !important; 
+                position: relative !important;
+                padding-left: 40% !important; 
+                text-align: right !important;
+                min-height: 45px !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: flex-end !important;
+                font-size: 14px !important;
+                word-break: break-word !important;
+            }
+            
+            table.data-table td:last-child {
+                border-bottom: 0 !important;
+                justify-content: center !important;
+                padding-left: 10px !important;
+                text-align: center !important;
+                background: #f8fafc !important;
+                border-radius: 0 0 12px 12px !important;
+                margin-top: 10px !important;
+                padding-top: 15px !important;
+                padding-bottom: 15px !important;
+            }
+            
+            table.data-table td:before { 
+                position: absolute !important;
+                top: 50% !important;
+                left: 15px !important;
+                transform: translateY(-50%) !important;
+                width: 35% !important; 
+                padding-right: 10px !important; 
+                white-space: nowrap !important;
+                content: attr(data-label) !important;
+                font-weight: 800 !important;
+                text-align: left !important;
+                color: #64748b !important;
+                font-size: 11px !important;
+                text-transform: uppercase !important;
+                letter-spacing: 0.5px !important;
+            }
+            
+            /* Special handling for certain cell types */
+            table.data-table td[data-label="Image"], 
+            table.data-table td[data-label="Select"],
+            table.data-table td[data-label=""] {
+                padding-left: 15px !important;
+                justify-content: center !important;
+                text-align: center !important;
+            }
+            table.data-table td[data-label="Image"]:before,
+            table.data-table td[data-label="Select"]:before,
+            table.data-table td[data-label=""]:before { 
+                display: none !important; 
+            }
+
+            .btn { padding: 10px 15px !important; font-size: 14px !important; }
+            .header-row { flex-direction: column !important; align-items: flex-start !important; gap: 15px !important; }
+            .controls-bar { flex-direction: column !important; align-items: stretch !important; }
+            .search-box { width: 100% !important; }
+        }
+
+        /* Overlays */
+        #initialOverlay { position: fixed; inset: 0; background: #fff; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        #contentOverlay { position: absolute; inset: 0; background: rgba(255,255,255,0.8); z-index: 50; display: none; align-items: center; justify-content: center; backdrop-filter: blur(2px); }
+        .spinner { width: 45px; height: 45px; border: 4px solid #e2e8f0; border-top: 4px solid var(--primary-teal); border-radius: 50%; animation: spin 0.8s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <!-- Bootstrap Bundle JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</head>
+<body>
+
+<div id="initialOverlay">
+    <div class="spinner"></div>
+    <div style="margin-top:20px; color:var(--primary-teal); font-weight:bold; letter-spacing:1px;">ASTEERA ERP</div>
+</div>
+
+<!-- Desktop Sidebar -->
+<div class="sidebar">
+    <div class="sidebar-header"><img src="<?= logo ?>" class="logo"></div>
+    <div class="user-profile">
+        <img id="userPhoto" src="https://www.w3schools.com/howto/img_avatar.png" class="user-photo">
+        <div class="user-info-text">
+            <span id="userName" class="user-name">...</span>
+            <span id="userRole" class="user-role">...</span>
+        </div>
+    </div>
+    <div class="nav-menu" id="sideNav">
+        <div onclick="navigateTo('dashboard')" data-page="dashboard" class="nav-item"><i class="fas fa-th-large"></i> Dashboard</div>
+        <div onclick="navigateTo('inventory')" data-page="inventory" class="nav-item"><i class="fas fa-box-open"></i> Inventory</div>
+        <div onclick="navigateTo('suppliers')" data-page="suppliers" class="nav-item"><i class="fas fa-handshake"></i> Suppliers</div>
+        <div onclick="navigateTo('purchases')" data-page="purchases" class="nav-item"><i class="fas fa-cart-plus"></i> Purchases</div>
+        <div onclick="navigateTo('sales')" data-page="sales" class="nav-item"><i class="fas fa-file-invoice-dollar"></i> Sales</div>
+        <div onclick="navigateTo('orders')" data-page="orders" class="nav-item"><i class="fas fa-shopping-cart"></i> Orders</div>
+        <div onclick="navigateTo('expenses')" data-page="expenses" class="nav-item"><i class="fas fa-wallet"></i> Expenses</div>
+        <div onclick="navigateTo('profile')" data-page="profile" class="nav-item"><i class="fas fa-user-cog"></i> Profile</div>
+    </div>
+    <div class="logout-btn" onclick="handleLogout()"><i class="fas fa-power-off me-2"></i> Logout</div>
+</div>
+
+<!-- Mobile Bottom Navigation -->
+<div class="mobile-nav" id="mobileNav">
+    <div onclick="navigateTo('dashboard')" data-page="dashboard" class="mobile-nav-item"><i class="fas fa-home"></i><span>Home</span></div>
+    <div onclick="navigateTo('inventory')" data-page="inventory" class="mobile-nav-item"><i class="fas fa-box"></i><span>Stock</span></div>
+    <div onclick="navigateTo('suppliers')" data-page="suppliers" class="mobile-nav-item"><i class="fas fa-handshake"></i><span>Suplr</span></div>
+    <div onclick="navigateTo('purchases')" data-page="purchases" class="mobile-nav-item"><i class="fas fa-cart-plus"></i><span>Purch</span></div>
+    <div onclick="navigateTo('orders')" data-page="orders" class="mobile-nav-item"><i class="fas fa-shopping-cart"></i><span>Orders</span></div>
+    <div onclick="navigateTo('sales')" data-page="sales" class="mobile-nav-item"><i class="fas fa-receipt"></i><span>Sales</span></div>
+    <div onclick="navigateTo('expenses')" data-page="expenses" class="mobile-nav-item"><i class="fas fa-wallet"></i><span>Expns</span></div>
+    <div onclick="navigateTo('profile')" data-page="profile" class="mobile-nav-item"><i class="fas fa-user"></i><span>User</span></div>
+</div>
+
+<div class="main-wrapper">
+    <div class="top-bar">
+        <div class="brand-text">ASTEERA <span style="color:var(--accent-orange)">ERP</span></div>
+        <div class="time-pill">
+            <i class="far fa-clock me-2"></i>
+            <span id="currentTime">...</span>
+        </div>
+    </div>
+    <div class="content-area" id="pageContent">
+        <div id="contentOverlay"><div class="spinner"></div></div>
+    </div>
+</div>
+
+<script>
+    const SCRIPT_URL = "<?= scriptUrl ?>";
+    let currentUser = null;
+
+    // IMMEDIATE LOGIN CHECK
+    try {
+        currentUser = JSON.parse(localStorage.getItem('asteera_user'));
+    } catch(e) { console.error("Session error", e); }
+
+    if (!currentUser) {
+        window.location.replace(SCRIPT_URL + "?page=login");
+    }
+
+    $(document).ready(function() {
+        if (!currentUser) return;
+        
+        google.script.run.withSuccessHandler(latest => {
+            if (latest) {
+                currentUser.permissions = latest.permissions; 
+                currentUser.role = latest.role;
+                localStorage.setItem('asteera_user', JSON.stringify(currentUser));
+                finishInit();
+            } else { handleLogout(); }
+        }).getLatestUserSession(currentUser.email);
+    });
+
+    function finishInit() {
+        $('#userName').text(currentUser.name); 
+        $('#userRole').text(currentUser.role);
+        if(currentUser.photo) $('#userPhoto').attr('src', currentUser.photo);
+        
+        const allowed = currentUser.permissions || [];
+        $('.nav-item, .mobile-nav-item').each(function() {
+            const p = $(this).data('page');
+            if (p && p !== 'profile' && allowed.indexOf(p) === -1) $(this).addClass('hidden');
+        });
+        
+        navigateTo("<?= page ?>", true);
+    }
+
+    function navigateTo(pageName, isInitial = false) {
+        // 1. INSTANT VISUAL FEEDBACK
+        $('.nav-item, .mobile-nav-item').removeClass('active');
+        $(`[data-page="${pageName}"]`).addClass('active');
+        
+        const contentDiv = document.getElementById('pageContent');
+        const cacheKey = 'asteera_cache_' + pageName;
+
+        // 2. SMART CACHE: Show previous version immediately if it exists.
+        // If the cached page's script throws, the cache is poisoned (old/broken
+        // version) — purge it and fall back to the loading overlay instead of
+        // leaving a silently dead page.
+        let cachedHtml = localStorage.getItem(cacheKey);
+        let cacheHealthy = false;
+        if (cachedHtml && !isInitial) {
+            contentDiv.innerHTML = cachedHtml;
+            cacheHealthy = true;
+            const scripts = contentDiv.getElementsByTagName('script');
+            for (let i = 0; i < scripts.length; i++) {
+                try { window.eval(scripts[i].innerText); }
+                catch(e) {
+                    console.error("Cached '" + pageName + "' script failed — purging cache: " + e.message);
+                    localStorage.removeItem(cacheKey);
+                    cachedHtml = null;
+                    cacheHealthy = false;
+                    break;
+                }
+            }
+            if (!cacheHealthy) {
+                contentDiv.innerHTML = '<div id="contentOverlay" style="display:flex; position:absolute; inset:0; align-items:center; justify-content:center;"><div class="spinner"></div></div>';
+            } else {
+                console.log("Loaded " + pageName + " from instant cache.");
+            }
+        } else {
+            if (!isInitial) $('#contentOverlay').css('display', 'flex');
+        }
+
+        // 3. FETCH FRESH DATA IN BACKGROUND
+        google.script.run.withSuccessHandler(html => {
+            if (html === "SESSION_EXPIRED") { handleLogout(); return; }
+
+            // Re-render when content changed OR the cached copy failed to run
+            if (html !== cachedHtml || !cacheHealthy) {
+                contentDiv.innerHTML = html;
+                const scripts = contentDiv.getElementsByTagName('script');
+                for (let i = 0; i < scripts.length; i++) {
+                    try { window.eval(scripts[i].innerText); }
+                    catch(e) {
+                        // Surface the failure instead of dying silently
+                        console.error("'" + pageName + "' script error: " + e.message);
+                        contentDiv.insertAdjacentHTML('afterbegin',
+                          '<div style="background:#fee2e2; color:#b91c1c; padding:12px 20px; margin:10px; border-radius:8px; font-weight:600;">' +
+                          'PAGE SCRIPT ERROR: ' + e.message + '</div>');
+                    }
+                }
+                localStorage.setItem(cacheKey, html);
+            }
+
+            if (isInitial) $('#initialOverlay').fadeOut(300);
+            else $('#contentOverlay').fadeOut(200);
+
+            localStorage.setItem('asteera_last_page', pageName);
+        }).withFailureHandler(err => {
+            // Never leave the user staring at a frozen page
+            if (isInitial) $('#initialOverlay').fadeOut(300);
+            else $('#contentOverlay').fadeOut(200);
+            contentDiv.innerHTML =
+              '<div style="background:#fee2e2; color:#b91c1c; padding:20px; margin:20px; border-radius:8px; font-weight:600;">' +
+              'FAILED TO LOAD "' + pageName + '": ' + err.message + '</div>';
+        }).getPageHTML(pageName, currentUser.email);
+    }
+
+    function handleLogout() { 
+        localStorage.removeItem('asteera_user'); 
+        window.top.location.href = SCRIPT_URL + "?page=login"; 
+    }
+
+    function updateTime() { 
+        const now = new Date();
+        $('#currentTime').text(now.toLocaleDateString('en-US', { day:'2-digit', month:'short' }) + ' | ' + now.toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit' })); 
+    }
+    setInterval(updateTime, 10000); updateTime();
+</script>
+</body>
+</html>

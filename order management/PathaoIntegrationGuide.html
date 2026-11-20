@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <base target="_top">
+    <title>Pathao API Integration Guide</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; line-height: 1.6; color: #333; }
+        h1, h2, h3 { color: #2C3E50; margin-top: 1.5em; }
+        h1 { font-size: 2em; }
+        h2 { font-size: 1.5em; }
+        h3 { font-size: 1.2em; }
+        code { background-color: #f4f4f4; padding: 2px 4px; border-radius: 4px; }
+        pre { background-color: #f4f4f4; padding: 10px; border-radius: 4px; overflow-x: auto; }
+        ul { list-style-type: disc; margin-left: 20px; }
+        ol { list-style-type: decimal; margin-left: 20px; }
+        .highlight { background-color: #e0ffe0; padding: 5px; border-left: 5px solid #4CAF50; margin-bottom: 1em; }
+        .warning { background-color: #ffe0e0; padding: 5px; border-left: 5px solid #F44336; margin-bottom: 1em; }
+    </style>
+</head>
+<body>
+
+    <h1>Pathao API Integration Guide</h1>
+    <p>This document explains the setup and functionality of the Pathao Courier integration with your Google Sheets, primarily driven by the <code>PathaoIntegration.gs</code> script.</p>
+
+    <h2>1. Overall Purpose of <code>PathaoIntegration.gs</code>:</h2>
+    <p>This script is designed to automate interaction with the Pathao Courier Merchant API. Its main functionalities include:</p>
+    <ul>
+        <li><strong>Authentication</strong>: Securely obtaining and managing access tokens required by Pathao.</li>
+        <li><strong>Location Data Management</strong>: Fetching and caching lists of Pathao-supported cities (districts) and zones (thanas) with their IDs.</li>
+        <li><strong>Order Creation</strong>: Sending new delivery orders to Pathao based on processed data from your Google Sheet.</li>
+        <li><strong>User Interface</strong>: Providing a user-friendly way to configure API credentials and refresh location data directly from the Google Sheet.</li>
+    </ul>
+
+    <h2>2. Required Credentials and How They Are Managed:</h2>
+    <p>The Pathao API uses OAuth 2.0, which requires several pieces of information for authentication and to identify your merchant account. These are now managed securely using Google Apps Script's <code>PropertiesService</code> and configured through a dedicated sidebar UI.</p>
+
+    <h3>Credentials Needed:</h3>
+    <ul>
+        <li><strong><code>Client ID</code></strong>: Your unique identifier for your application with Pathao.</li>
+        <li><strong><code>Client Secret</code></strong>: A confidential key used to authenticate your application.</li>
+        <li><strong><code>Username (Email)</code></strong>: The email address associated with your Pathao merchant account.</li>
+        <li><strong><code>Password</code></strong>: The password for your Pathao merchant account.</li>
+        <li><strong><code>Pathao API Base URL</code></strong>: The base endpoint for Pathao API requests (e.g., <code>https://api-hermes.pathao.com</code> for production or <code>https://courier-api-sandbox.pathao.com</code> for testing).</li>
+        <li><strong><code>Pathao Store ID</code></strong>: A specific ID for one of your registered stores with Pathao. This ID tells Pathao where the pickup location for an order is.</li>
+    </ul>
+
+    <h3>How to Configure These:</h3>
+    <p>You no longer need to edit the script code directly for these. Instead, from your Google Sheet:</p>
+    <ol>
+        <li>Go to <strong><code>Pathao Orders</code></strong> (custom menu) -> <strong><code>Configure Pathao API</code></strong>.</li>
+        <li>A sidebar will open where you can input these values.</li>
+        <li>Click "Save Configuration" to securely store them using <code>PropertiesService</code>, which keeps them private to your script and Google account.</li>
+    </ol>
+
+    <h2>3. Authentication Flow (<code>getAccessToken</code> and <code>_getAuthTokenForPathaoIntegration</code>):</h2>
+    <p>The Pathao API's OAuth 2.0 authentication is handled automatically by the script:</p>
+    <ul>
+        <li><strong><code>getAccessToken(config)</code> Function:</strong>
+            <ul>
+                <li><strong>Token Caching for Efficiency:</strong> It checks <code>PropertiesService</code> for an existing, valid <code>access_token</code>. If found and not expired (with a 5-minute safety buffer), it returns the cached token.</li>
+                <li><strong>Automated Token Refresh:</strong> If the token is expired but a <code>refresh_token</code> is available, it automatically uses the <code>refresh_token</code> to request a new <code>access_token</code> from Pathao's <code>/issue-token</code> endpoint.</li>
+                <li><strong>Initial Authentication:</strong> If no valid tokens are found, it performs the initial authentication using your configured <code>username</code> and <code>password</code> to obtain both an <code>access_token</code> and a <code>refresh_token</code>.</li>
+                <li><strong>Secure Storage:</strong> All new tokens and their expiry times are securely saved into <code>PropertiesService</code>.</li>
+            </ul>
+        </li>
+        <li><strong><code>_getAuthTokenForPathaoIntegration()</code> Helper:</strong>
+            <ul>
+                <li>An internal helper used by functions like <code>fetchPathaoLocations()</code> to securely retrieve an access token using the stored configuration.</li>
+            </ul>
+        </li>
+        <li><strong>Forced Re-authentication upon Credential Changes:</strong>
+            <ul>
+                <li>If you modify any API credentials (Client ID, Secret, Username, Password, or Base URL) in the sidebar and save, the script automatically deletes existing tokens from <code>PropertiesService</code>. This forces a fresh authentication with the new credentials the next time an API call is made, preventing potential errors.</li>
+            </ul>
+        </li>
+    </ul>
+
+    <h2>4. Location Data Management (<code>fetchPathaoLocations</code>, <code>getOrFetchPathaoLocations</code>):</h2><!-- UPDATED -->
+    <p>To accurately identify District and Thana IDs, the script needs a comprehensive list of Pathao's recognized locations.</p>
+    <ul>
+        <li><strong><code>fetchPathaoLocations()</code>:</strong>
+            <ul>
+                <li>This function makes API calls to Pathao (using your access token) to get the complete lists of:
+                    <ul>
+                        <li><strong>Cities</strong> (<code>/aladdin/api/v1/city-list</code>) - These are treated as Districts.</li>
+                        <li><strong>Zones</strong> (<code>/aladdin/api/v1/cities/{city_id}/zone-list</code> for each city) - These are treated as Thanas.</li>
+                    </ul>
+                </li>
+                <li><strong>API Rate Limiting & Delay:</strong> A 300ms delay is now included between fetching zones for each city to avoid hitting Pathao API rate limits.</li><!-- NEW -->
+                <li><strong>Smart Caching:</strong> The fetched cities and zones (with their <code>id</code>s and <code>name</code>s) are stored in <code>PropertiesService</code>, along with a timestamp. This cache is valid for 24 hours to reduce API calls.</li>
+                <li><strong>Visual Cache Representation:</strong> The fetched location data is also written to a sheet named "<code>pathao addresses</code>". This sheet serves as a readable copy of the cached data and is populated each time locations are refreshed.</li><!-- NEW -->
+                <li><strong>Manual Refresh:</strong> You can trigger a manual refresh of this data via <strong><code>Pathao Orders</code></strong> -> <strong><code>Refresh Pathao Locations</code></strong> in the sheet's menu or by clicking the button in the configuration sidebar.</li>
+            </ul>
+        </li>
+        <li><strong><code>getOrFetchPathaoLocations()</code>:</strong>
+            <ul>
+                <li>This is the function used by the script to get location data. It first checks for valid cached data. If the cache is old or missing, it automatically calls <code>fetchPathaoLocations()</code> to update the cache before returning the data.</li>
+                <li><strong>Dropdown Source:</strong> All dropdown options for Districts and Thanas, as well as the logic for fuzzy matching, are sourced directly from this cached memory for optimal performance, not from the "<code>pathao addresses</code>" sheet.</li><!-- NEW -->
+            </ul>
+        </li>
+    </ul>
+
+    <h2>5. Order Creation (<code>createPathaoOrder</code>):</h2>
+    <p>This function sends your processed order details to Pathao.</p>
+    <ul>
+        <li>It uses the <code>access_token</code> to authenticate the request to Pathao's <code>/aladdin/api/v1/orders</code> endpoint.</li>
+        <li>The <code>orderPayload</code> contains all delivery details, including <code>store_id</code>, recipient information, product details, and the <code>amount_to_collect</code>.</li>
+        <li>Crucially, the <code>recipient_city</code> and <code>recipient_zone</code> parameters (which use the <code>cityId</code> and <code>zoneId</code> from the address extraction) are part of this payload, ensuring the order is routed correctly.</li>
+        <li><strong>Prioritizing Existing IDs:</strong> When an order is placed, the script first attempts to use any existing values in the <code>District ID</code> and <code>Thana ID</code> columns directly. Fuzzy matching and ID lookup only occur if these ID columns are empty.</li><!-- NEW -->
+    </ul>
+
+    <h2>6. Webhook Integration (<code>PathaoWebhook.gs</code>):</h2>
+    <p>This is a separate script designed to <em>receive</em> status updates <em>from</em> Pathao regarding your orders.</p>
+    <ul>
+        <li>You deploy it as a Google Apps Script Web App, which gives it a unique URL.</li>
+        <li>This URL and a <code>WEBHOOK_SECRET</code> are provided to Pathao through their merchant panel.</li>
+        <li>When Pathao sends an update (e.g., "Order Delivered"), <code>PathaoWebhook.gs</code> verifies the secret and then uses the <code>consignment_id</code> (tracking number) from the payload to find the corresponding row in your sheet and update its "Order Status".</li>
+    </ul>
+
+    <h2>7. Address Location Processing and Dynamic Dropdowns (in <code>PathaoIntegration.gs</code> and <code>onEdit</code> trigger):<!-- NEW SECTION --></h2>
+    <p>The script intelligently processes address information to identify Pathao locations and provides an interactive user experience in your main order sheet.</p>
+    <ul>
+        <li><strong>Automated ID Population (`findAndSetLocationIds`):</strong>
+            <ul>
+                <li>When the <code>CUSTOMER ADDRESS</code> column is edited, or when "<code>Find & Fill Missing Locations</code>" is clicked, this function attempts to extract <code>District</code> and <code>Thana</code> information.</li>
+                <li><strong>Fuzzy Matching & Accuracy:</strong>
+                    <ul>
+                        <li>The system uses Levenshtein distance for fuzzy matching to account for minor misspellings.</li>
+                        <li>It employs a two-pass approach:
+                            <ol>
+                                <li><strong>Primary Match:</strong> Seeks the best match with a similarity score of 70% (0.7) or higher.</li>
+                                <li><strong>Secondary Fallback:</strong> If no primary match is found, it accepts the single best match with the highest overall similarity score (even if below 70%), aiming for the "nearest matching" location.</li>
+                            </ol>
+                        </li>
+                        <li><strong>Prioritizing End of Address:</strong> When searching for matches, words appearing later in the address string are prioritized.</li>
+                        <li><strong>Visual Cues:</strong> If a fuzzy match (primary or secondary) is made, the <code>District</code> and <code>Thana</code> cells are formatted in red to indicate a non-exact match.</li>
+                        <li><strong>Clearing on No Match:</strong> If an address edit results in no matching District or Thana, any previously filled data and formatting in the <code>District</code>, <code>Thana</code>, <code>District ID</code>, and <code>Thana ID</code> cells are explicitly cleared, and the Thana dropdown is reset.</li>
+                    </ul>
+                </li>
+            </ul>
+        </li>
+        <li><strong>Interactive Dynamic Dropdowns (`setupLocationDropdowns` and `onEdit`):</strong>
+            <ul>
+                <li><strong>Initial Setup:</strong> The <strong><code>Pathao Orders</code></strong> -> <strong><code>Setup Location Dropdowns</code></strong> menu item (or function) configures the data validation. It sets up a dropdown for the <code>District</code> column listing all available districts and a placeholder dropdown for the <code>Thana</code> column. This setup is applied to a practical range of rows (e.g., 500 rows) even on empty sheets.</li>
+                <li><strong>Dynamic Thana Options:</strong> When a <code>District</code> is selected from its dropdown:
+                    <ul>
+                        <li>The <code>Thana</code> dropdown in the same row is automatically updated to show only Thanas belonging to the selected District.</li>
+                        <li>The corresponding <code>District ID</code> is auto-populated.</li>
+                        <li>The existing <code>Thana</code> selection and <code>Thana ID</code> are cleared.</li>
+                    </ul>
+                </li>
+                <li><strong>Thana ID Auto-population:</strong> When a <code>Thana</code> is selected from its (now dynamic) dropdown, the corresponding <code>Thana ID</code> is automatically populated.</li>
+                <li><strong>Automatic Thana Dropdown Update with Address Edits:</strong> If <code>District</code> and <code>Thana</code> are automatically identified and filled based on an address edit (via `findAndSetLocationIds`), the <code>Thana</code> dropdown for that row is also dynamically updated with the correct options for the identified District.</li>
+            </ul>
+        </li>
+    </ul>
+
+    <h2>Steps to Get Started:</h2><!-- UPDATED -->
+    <ol>
+        <li><strong>Open Google Apps Script Project</strong>: Go to your Google Sheet (the one with ID <code>1Ad1xyjH96HKUMt5BijlBgpqKuzcd8JZf0NBdm0OhA7A</code>) and open <code>Extensions &gt; Apps Script</code>.</li>
+        <li><strong>Ensure Scripts are Up-to-Date</strong>: Make sure <code>code.js</code>, <code>PathaoIntegration.gs</code>, <code>PathaoWebhook.gs</code>, and <code>PathaoConfig.html</code> in your Apps Script project contain the latest code provided to you.</li>
+        <li><strong>Deploy <code>PathaoWebhook.gs</code> as a Web App</strong>: As instructed previously, deploy this script as a Web App and configure its URL and <code>WEBHOOK_SECRET</code> in your Pathao Merchant Panel.</li>
+        <li><strong>Configure Pathao API Credentials</strong>:
+            <ol type="a">
+                <li>In your Google Sheet, go to <strong><code>Pathao Orders</code></strong> -> <strong><code>Configure Pathao API</code></strong>.</li>
+                <li>Fill in all the required fields (<code>Client ID</code>, <code>Client Secret</code>, <code>Username</code>, <code>Password</code>, <code>Base URL</code>, <code>Pathao Store ID</code>).</li>
+                <li><strong>Important</strong>: Use your Pathao merchant account credentials. For <code>Base URL</code>, choose <code>https://api-hermes.pathao.com</code> for production.</li>
+                <li>Click "Save Configuration".</li>
+            </ol>
+        </li>
+        <li><strong>Authorize Script</strong>: The first time you run these functions (especially after saving config or refreshing locations), Google will ask for authorization. Follow the prompts to grant necessary permissions.</li>
+        <li><strong>Refresh Pathao Locations</strong>: Go to <strong><code>Pathao Orders</code></strong> -> <strong><code>Refresh Pathao Locations</code></strong> (or click the button in the configuration sidebar). This is vital to populate the internal lists of cities and zones needed for address parsing and for the "<code>pathao addresses</code>" sheet.</li><!-- UPDATED -->
+        <li><strong>Setup Location Dropdowns</strong>: Go to <strong><code>Pathao Orders</code></strong> -> <strong><code>Setup Location Dropdowns</code></strong>. This will configure the interactive District and Thana dropdowns in your main order sheet. This step needs to be done once after setting up the script, or if you create new sheets/columns and want the dropdowns applied.</li><!-- NEW -->
+        <li><strong>Start Processing Orders</strong>: Now, when new form submissions come in or you edit address cells, the script should automatically extract and populate all the necessary data, including District, Thana, and their IDs, ready for Pathao order creation. You can also manually select locations using the new dropdowns.</li><!-- UPDATED -->
+    </ol>
+    <p>This comprehensive setup ensures a robust and automated integration with the Pathao Courier Merchant API.</p>
+
+</body>
+</html>
