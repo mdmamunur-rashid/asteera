@@ -10,7 +10,8 @@
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
     "create-admin": "tsx --env-file=.env scripts/create-admin.ts",
-    "cpanel:setup": "node scripts/cpanel-setup.mjs"
+    "cpanel:setup": "node scripts/cpanel-setup.mjs",
+    "cpanel:restart": "node scripts/cpanel-restart.mjs"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
