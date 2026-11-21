@@ -47,7 +47,7 @@ export default async function OrderDetail({
       {ok && <div className="card noprint" style={{ background: "#d1fae5", color: "#065f46" }}>{ok}</div>}
 
       <div className="invoice">
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 20, borderBottom: "2px solid var(--navy)", paddingBottom: 16, marginBottom: 18 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 20, borderBottom: "2px solid var(--primary)", paddingBottom: 16, marginBottom: 18 }}>
           <div>
             {activeBrand.logoUrl && (
               <div style={{ width: 220, height: 92, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "flex-start", marginBottom: 6 }}>
@@ -75,14 +75,14 @@ export default async function OrderDetail({
 
         <div style={{ display: "flex", justifyContent: "space-between", gap: 20, marginBottom: 18, fontSize: 13.5 }}>
           <div>
-            <div style={{ fontSize: 12, fontWeight: 700, color: "var(--navy)", textTransform: "uppercase", marginBottom: 4 }}>Invoice To:</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "var(--primary)", textTransform: "uppercase", marginBottom: 4 }}>Invoice To:</div>
             <b>{o.customerName}</b><br />
             {o.phone && <>Mobile: {o.phone}<br /></>}
             {o.address && <>{o.address}</>}
           </div>
           {o.courier && (
             <div style={{ textAlign: "right" }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: "var(--navy)", textTransform: "uppercase", marginBottom: 4 }}>Courier:</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "var(--primary)", textTransform: "uppercase", marginBottom: 4 }}>Courier:</div>
               <b>{o.courier}</b><br />
               Tracking: {o.trackingNo || "—"}
             </div>

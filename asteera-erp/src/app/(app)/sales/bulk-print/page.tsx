@@ -50,7 +50,7 @@ export default async function BulkPrintSales({
         const lines = allLines.filter((l) => l.orderId === o.id);
         return (
           <div key={o.id} className="invoice" style={{ marginBottom: 24, pageBreakAfter: "always" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "2px solid var(--navy)", paddingBottom: 12, marginBottom: 14 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "2px solid var(--primary)", paddingBottom: 12, marginBottom: 14 }}>
               <div>
                 {activeBrand.logoUrl && <img src={activeBrand.logoUrl} alt={activeBrand.name} style={{ maxHeight: 76, maxWidth: 220, objectFit: "contain" }} />}
                 <h3 style={{ margin: "4px 0 0" }}>{activeBrand.name}</h3>
