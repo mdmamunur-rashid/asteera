@@ -2,7 +2,7 @@ import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { ALL_MODULES, resolvePermissions } from "./auth";
-import { getSettingsMap } from "./settings";
+import { getSettingsMap, normalizeLogoUrl } from "./settings";
 
 /** Minimal RFC-4180 CSV parser handling quoted fields and embedded newlines. */
 function parseCsv(text: string): string[][] {
@@ -75,10 +75,11 @@ export async function syncFromGoogleSheets(): Promise<SyncResult> {
     // 1. Brandings
     const bRows = await fetchSheetTab(invId, "Brandings");
     for (let i = 1; i < bRows.length; i++) {
-      const [name, address, logoUrl, phone] = bRows[i];
+      const [name, address, rawLogo, phone] = bRows[i];
       if (!name) continue;
-      await db.insert(schema.brandings).values({ name, address: address || "", logoUrl: logoUrl || "", phone: phone || "" })
-        .onDuplicateKeyUpdate({ set: { address: address || "", logoUrl: logoUrl || "", phone: phone || "" } });
+      const logoUrl = normalizeLogoUrl(rawLogo);
+      await db.insert(schema.brandings).values({ name, address: address || "", logoUrl, phone: phone || "" })
+        .onDuplicateKeyUpdate({ set: { address: address || "", logoUrl, phone: phone || "" } });
       counts.brandings++;
     }
 

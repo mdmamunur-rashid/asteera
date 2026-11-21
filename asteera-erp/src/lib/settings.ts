@@ -16,9 +16,17 @@ export async function setSetting(k: string, v: string) {
   await db.insert(schema.settings).values({ k, v }).onDuplicateKeyUpdate({ set: { v } });
 }
 
+export function normalizeLogoUrl(raw?: string | null): string {
+  const url = String(raw ?? "").trim();
+  if (!url) return "";
+  const m = url.match(/drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?(?:export=view&)?id=)([a-zA-Z0-9_-]+)/);
+  return m ? `https://lh3.googleusercontent.com/d/${m[1]}` : url;
+}
+
 export async function getBrandings() {
   try {
-    return await db.select().from(schema.brandings).orderBy(desc(schema.brandings.isDefault), schema.brandings.id);
+    const rows = await db.select().from(schema.brandings).orderBy(desc(schema.brandings.isDefault), schema.brandings.id);
+    return rows.map((b) => ({ ...b, logoUrl: normalizeLogoUrl(b.logoUrl) }));
   } catch {
     return [];
   }
@@ -44,5 +52,5 @@ export async function isStandaloneMode(): Promise<boolean> {
 export async function getBrandByName(name?: string | null) {
   if (!name) return getDefaultBrand();
   const [b] = await db.select().from(schema.brandings).where(eq(schema.brandings.name, name)).limit(1);
-  return b ?? getDefaultBrand();
+  return b ? { ...b, logoUrl: normalizeLogoUrl(b.logoUrl) } : getDefaultBrand();
 }

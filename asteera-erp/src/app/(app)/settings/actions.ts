@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { canAccess, requireSession } from "@/lib/auth";
-import { setSetting } from "@/lib/settings";
+import { normalizeLogoUrl, setSetting } from "@/lib/settings";
 import { syncFromGoogleSheets } from "@/lib/sheets-sync";
 import { str } from "@/lib/util";
 
@@ -16,7 +16,7 @@ async function requireSettingsAccess() {
 export async function saveBranding(f: FormData) {
   await requireSettingsAccess();
   const id = Number(f.get("id"));
-  const name = str(f, "name"), address = str(f, "address"), logoUrl = str(f, "logoUrl"), phone = str(f, "phone");
+  const name = str(f, "name"), address = str(f, "address"), logoUrl = normalizeLogoUrl(str(f, "logoUrl")), phone = str(f, "phone");
   if (!name) redirect("/settings?error=Brand+name+required");
 
   if (id > 0) {
