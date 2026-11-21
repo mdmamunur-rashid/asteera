@@ -9,16 +9,36 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Pull latest main in cPanel Git Version Control
-        run: |
-          curl -fsS -H "Authorization: cpanel innerspinbd:${{ secrets.CPANEL_API_TOKEN }}" \
-            --get --data-urlencode "repository_root=/home/innerspinbd/asteera" \
-            "https://s1304.sgp1.mysecurecloudhost.com:2083/execute/VersionControl/update"
+      - uses: actions/checkout@v4
 
-      - name: Trigger Passenger restart (tmp/restart.txt)
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: asteera-erp/package-lock.json
+
+      - name: Build Next.js app
+        working-directory: asteera-erp
         run: |
-          curl -fsS -X POST -H "Authorization: cpanel innerspinbd:${{ secrets.CPANEL_API_TOKEN }}" \
-            --data-urlencode "dir=/home/innerspinbd/asteera/asteera-erp/tmp" \
-            --data-urlencode "file=restart.txt" \
-            --data-urlencode "content=${{ github.sha }}" \
-            "https://s1304.sgp1.mysecurecloudhost.com:2083/execute/Fileman/save_file_content"
+          npm ci
+          npm run build
+          mkdir -p tmp
+          echo "${{ github.sha }}" > tmp/restart.txt
+
+      - name: Deploy over FTPS
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: s1304.sgp1.mysecurecloudhost.com
+          username: deploy@innerspinbd.com
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ftps
+          local-dir: ./asteera-erp/
+          server-dir: /
+          dangerous-clean-slate: false
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/node_modules/**
+            **/.next/cache/**
+            **/.env*
+            next-build.tar.gz
