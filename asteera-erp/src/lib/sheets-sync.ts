@@ -64,9 +64,13 @@ export async function syncFromGoogleSheets(): Promise<SyncResult> {
 
   const invId = s.inv_sheet_id || "";
   const ordId = s.order_sheet_id || "";
-  const counts: Record<string, number> = { users: 0, items: 0, suppliers: 0, brandings: 0, expenses: 0, orders: 0 };
+  const prodId = s.prod_sheet_id || "";
+  const counts: Record<string, number> = {
+    users: 0, items: 0, suppliers: 0, brandings: 0, expenses: 0,
+    purchases: 0, orders: 0, fabrics: 0, batches: 0, ledger: 0,
+  };
 
-  if (!invId && !ordId) {
+  if (!invId && !ordId && !prodId) {
     return { ok: false, message: "No Google Spreadsheet IDs configured.", counts };
   }
 
@@ -170,6 +174,50 @@ export async function syncFromGoogleSheets(): Promise<SyncResult> {
       }
       counts.users++;
     }
+
+    // 5b. PurchaseOrders & PurchaseDetails
+    const poRows = await fetchSheetTab(invId, "PurchaseOrders");
+    const pdRows = await fetchSheetTab(invId, "PurchaseDetails");
+    if (poRows.length > 1 || pdRows.length > 1) {
+      const allSups = await db.select().from(schema.suppliers);
+      const supByCode = new Map(allSups.map((x) => [x.code.toLowerCase(), x.id]));
+      const allItems = await db.select().from(schema.items);
+      const itemBySku = new Map(allItems.map((x) => [x.sku.toLowerCase(), x.id]));
+
+      const pdByPo = new Map<string, { itemId: number; qty: number; unitCost: number }[]>();
+      for (let i = 1; i < pdRows.length; i++) {
+        const r = pdRows[i];
+        const poNo = (r[1] || "").trim();
+        const itemId = itemBySku.get((r[4] || "").trim().toLowerCase());
+        if (!poNo || !itemId) continue;
+        if (!pdByPo.has(poNo)) pdByPo.set(poNo, []);
+        pdByPo.get(poNo)!.push({ itemId, qty: numVal(r[7]) || 1, unitCost: numVal(r[8]) });
+      }
+
+      for (let i = 1; i < poRows.length; i++) {
+        const r = poRows[i];
+        const poNo = (r[1] || "").trim();
+        if (!poNo) continue;
+        const [exists] = await db.select({ id: schema.purchaseOrders.id }).from(schema.purchaseOrders).where(eq(schema.purchaseOrders.poNo, poNo)).limit(1);
+        if (exists) continue;
+        let supplierId = supByCode.get((r[2] || "").trim().toLowerCase());
+        if (!supplierId && r[3]) {
+          const code = (r[2] || r[3]).trim();
+          const [insSup] = await db.insert(schema.suppliers).values({ code, name: r[3].trim() }).$returningId();
+          supplierId = insSup.id;
+          supByCode.set(code.toLowerCase(), supplierId);
+        }
+        if (!supplierId) continue;
+        const [insPo] = await db.insert(schema.purchaseOrders).values({
+          poNo, date: normDate(r[0]), supplierId, paid: numVal(r[5]),
+        }).$returningId();
+        const lines = pdByPo.get(poNo) ?? [];
+        if (lines.length > 0) {
+          await db.insert(schema.purchaseLines).values(lines.map((l) => ({ poId: insPo.id, ...l })));
+        }
+        counts.purchases++;
+      }
+    }
   }
 
   // 6. SalesDetails from Order Sheet
@@ -211,9 +259,121 @@ export async function syncFromGoogleSheets(): Promise<SyncResult> {
     }
   }
 
+  // 7. Production Sheet (Fabrics, Fabric Purchases, Production Batches, Payment Ledger)
+  if (prodId) {
+    const fabricMap = new Map<string, number>();
+    const existingFabrics = await db.select().from(schema.fabrics);
+    for (const f of existingFabrics) fabricMap.set(f.name.toLowerCase(), f.id);
+
+    const ensureFabric = async (name: string, unit = "goj"): Promise<number | null> => {
+      const clean = name.trim();
+      if (!clean) return null;
+      const hit = fabricMap.get(clean.toLowerCase());
+      if (hit) return hit;
+      const [ins] = await db.insert(schema.fabrics).values({ name: clean, unit: unit || "goj" }).$returningId();
+      fabricMap.set(clean.toLowerCase(), ins.id);
+      counts.fabrics++;
+      return ins.id;
+    };
+
+    const msRows = await fetchSheetTab(prodId, "Material Stock");
+    for (let i = 1; i < msRows.length; i++) {
+      const r = msRows[i];
+      if (r[1] && r[1].toLowerCase() !== "fabric name") await ensureFabric(r[1], r[2] || "goj");
+    }
+
+    const fpRows = await fetchSheetTab(prodId, "Purchase");
+    const hasFp = await db.select({ id: schema.fabricPurchases.id }).from(schema.fabricPurchases).limit(1);
+    if (hasFp.length === 0) {
+      for (let i = 1; i < fpRows.length; i++) {
+        const r = fpRows[i];
+        if (!r[1] || r[1].toLowerCase() === "fabric name") continue;
+        const q = numVal(r[3]);
+        if (q <= 0) continue;
+        const fabricId = await ensureFabric(r[1], r[2] || "goj");
+        if (fabricId) {
+          await db.insert(schema.fabricPurchases).values({
+            date: normDate(r[0]), fabricId, qty: q, unitPrice: numVal(r[4]),
+          });
+        }
+      }
+    }
+
+    const allSups = await db.select().from(schema.suppliers);
+    const supByCode = new Map(allSups.map((x) => [x.code.toLowerCase(), x.id]));
+    const ensureSup = async (codeRaw: string, nameRaw: string, type: string): Promise<number | null> => {
+      const code = (codeRaw || nameRaw).trim();
+      const name = (nameRaw || codeRaw).trim();
+      if (!code) return null;
+      const hit = supByCode.get(code.toLowerCase());
+      if (hit) return hit;
+      const [ins] = await db.insert(schema.suppliers).values({ code, name, type }).$returningId();
+      supByCode.set(code.toLowerCase(), ins.id);
+      return ins.id;
+    };
+
+    const prodRows = await fetchSheetTab(prodId, "Production Log");
+    const hasBatches = await db.select({ id: schema.productionBatches.id }).from(schema.productionBatches).limit(1);
+    if (hasBatches.length === 0) {
+      for (let i = 1; i < prodRows.length; i++) {
+        const r = prodRows[i];
+        const sku = (r[3] || r[17] || "").trim();
+        if (!sku || sku.toLowerCase() === "sku") continue;
+        const qty = numVal(r[4]) || numVal(r[18]);
+        if (qty <= 0) continue;
+        const fabricId = r[2] ? await ensureFabric(r[2]) : null;
+        const printSupId = await ensureSup(r[13] || "", r[12] || "", "Printing");
+        const sewSupId = await ensureSup(r[28] || "", r[27] || "", "Sewing");
+        const fpu = numVal(r[5]);
+        const printPay = numVal(r[11]);
+        const printRate = fpu > 0 && qty > 0 && printPay > 0 ? printPay / (qty * fpu) : 35;
+
+        await db.insert(schema.productionBatches).values({
+          date: normDate(r[0] || r[16]),
+          sku,
+          itemName: (r[1] || "").trim(),
+          fabricId,
+          qty,
+          fabricPerUnit: fpu,
+          printSupplierId: printSupId,
+          printRate,
+          printStatus: (r[8] || "Not Started").trim(),
+          printReceivedQty: numVal(r[9]),
+          sewSupplierId: sewSupId,
+          sewUnitCost: numVal(r[19]) || 100,
+          sewStatus: (r[21] || "Not Started").trim(),
+          sewReceivedQty: numVal(r[23]),
+        });
+        counts.batches++;
+      }
+    }
+
+    const ledRows = await fetchSheetTab(prodId, "Payment Ledger");
+    for (let i = 1; i < ledRows.length; i++) {
+      const r = ledRows[i];
+      const ref = (r[0] || "").trim();
+      if (!ref || ref.toLowerCase() === "invoice" || ref.toLowerCase() === "invoice no") continue;
+      const supplierId = await ensureSup(r[3] || "", r[4] || "", "Other");
+      if (!supplierId) continue;
+      await db.insert(schema.ledgerEntries).values({
+        ref,
+        date: normDate(r[5]),
+        dueDate: r[6] ? normDate(r[6]) : null,
+        supplierId,
+        sku: (r[1] || "").trim(),
+        description: (r[2] || "").trim(),
+        qty: numVal(r[8]),
+        unitCost: numVal(r[7]),
+        totalDue: numVal(r[9]),
+        amountPaid: numVal(r[10]),
+      }).onDuplicateKeyUpdate({ set: { totalDue: numVal(r[9]), amountPaid: numVal(r[10]) } });
+      counts.ledger++;
+    }
+  }
+
   return {
     ok: true,
-    message: `Synced from Google Sheets (Users: ${counts.users}, Items: ${counts.items}, Suppliers: ${counts.suppliers}, Brands: ${counts.brandings}, Expenses: ${counts.expenses}, Orders: ${counts.orders}).`,
+    message: `Synced (Users: ${counts.users}, Items: ${counts.items}, Suppliers: ${counts.suppliers}, POs: ${counts.purchases}, Orders: ${counts.orders}, Fabrics: ${counts.fabrics}, Batches: ${counts.batches}, Ledger: ${counts.ledger}).`,
     counts,
   };
   } catch (e) {
