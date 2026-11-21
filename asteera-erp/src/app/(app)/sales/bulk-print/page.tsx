@@ -1,7 +1,7 @@
 import { desc, eq, inArray, isNull } from "drizzle-orm";
 import { db, schema } from "@/db";
 import PrintButton from "@/components/PrintButton";
-import { getBrandByName, getBrandings, getSettingsMap } from "@/lib/settings";
+import { getBrandByName, getBrandings, getSettingsMap, normalizeLogoUrl } from "@/lib/settings";
 import { fmt } from "@/lib/util";
 import { markAllUnprinted } from "../actions";
 
@@ -27,7 +27,7 @@ export default async function BulkPrintSales({
   const sigUrl = cfg.authorized_signature_url || "";
   const ids = orders.map((o) => o.id);
   const allLines = ids.length > 0
-    ? await db.select({ orderId: schema.orderLines.orderId, sku: schema.items.sku, name: schema.items.name, size: schema.items.size, qty: schema.orderLines.qty, price: schema.orderLines.price })
+    ? await db.select({ orderId: schema.orderLines.orderId, sku: schema.items.sku, name: schema.items.name, size: schema.items.size, imageUrl: schema.items.imageUrl, qty: schema.orderLines.qty, price: schema.orderLines.price })
         .from(schema.orderLines).innerJoin(schema.items, eq(schema.items.id, schema.orderLines.itemId)).where(inArray(schema.orderLines.orderId, ids))
     : [];
 
@@ -65,15 +65,23 @@ export default async function BulkPrintSales({
             <table className="invoice-table">
               <thead><tr><th>Sl.</th><th>Item</th><th>Qty</th><th>Price (৳)</th><th>Total (৳)</th></tr></thead>
               <tbody>
-                {lines.map((l, i) => (
+                {lines.map((l, i) => {
+                  const imgUrl = normalizeLogoUrl(l.imageUrl);
+                  return (
                   <tr key={i}>
                     <td>{i + 1}</td>
-                    <td>{l.name} {l.size} <small>({l.sku})</small></td>
+                    <td>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        {imgUrl && <img src={imgUrl} alt={l.name} style={{ width: 38, height: 38, objectFit: "cover", borderRadius: 4, border: "1px solid var(--line)", flexShrink: 0 }} />}
+                        <span>{l.name} {l.size} <small>({l.sku})</small></span>
+                      </div>
+                    </td>
                     <td>{fmt(l.qty)}</td>
                     <td>৳ {fmt(l.price)}</td>
                     <td>৳ {fmt(l.qty * l.price)}</td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
               <tfoot>
                 <tr><td colSpan={4} align="right"><b>Total</b></td><td><b>৳ {fmt(o.total)}</b></td></tr>

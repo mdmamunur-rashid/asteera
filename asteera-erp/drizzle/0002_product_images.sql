@@ -1,0 +1,1 @@
+ALTER TABLE `items` MODIFY COLUMN `image_url` MEDIUMTEXT;

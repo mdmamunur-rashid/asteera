@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { requireSession } from "@/lib/auth";
 import { getStockMap } from "@/lib/queries";
+import { normalizeLogoUrl } from "@/lib/settings";
 import { num, str } from "@/lib/util";
 
 const back = (msg: string) => redirect(`/inventory?error=${encodeURIComponent(msg)}`);
@@ -18,11 +19,24 @@ export async function createItem(f: FormData) {
       sku, name, size: str(f, "size"), type: str(f, "type"), category: str(f, "category"),
       purchasePrice: num(f, "purchasePrice"), salePrice: num(f, "salePrice"),
       reorderLevel: Math.round(num(f, "reorderLevel")) || 5,
+      imageUrl: normalizeLogoUrl(str(f, "imageUrl")),
     });
   } catch {
     back(`SKU '${sku}' already exists`);
   }
   revalidatePath("/inventory");
+  redirect("/inventory");
+}
+
+export async function updateItemImage(f: FormData) {
+  await requireSession();
+  const id = Number(f.get("id"));
+  const imageUrl = normalizeLogoUrl(str(f, "imageUrl"));
+  if (id > 0) {
+    await db.update(schema.items).set({ imageUrl }).where(eq(schema.items.id, id));
+  }
+  revalidatePath("/inventory");
+  revalidatePath("/sales");
   redirect("/inventory");
 }
 

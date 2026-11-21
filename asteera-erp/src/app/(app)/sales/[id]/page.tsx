@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { and, desc, eq, ne, or } from "drizzle-orm";
 import { db, schema } from "@/db";
 import PrintButton from "@/components/PrintButton";
-import { getBrandByName, getBrandings, getSettingsMap } from "@/lib/settings";
+import { getBrandByName, getBrandings, getSettingsMap, normalizeLogoUrl } from "@/lib/settings";
 import { fmt, ORDER_STATUSES } from "@/lib/util";
 import { markPrinted, payOrder, processReturn, sendToPathao, sendToSteadfast, setOrderStatus } from "../actions";
 
@@ -22,7 +22,7 @@ export default async function OrderDetail({
   if (!o) notFound();
 
   const [lines, brands, activeBrand, cfg, returns, prevOrders] = await Promise.all([
-    db.select({ id: schema.orderLines.id, sku: schema.items.sku, name: schema.items.name, size: schema.items.size, qty: schema.orderLines.qty, price: schema.orderLines.price })
+    db.select({ id: schema.orderLines.id, sku: schema.items.sku, name: schema.items.name, size: schema.items.size, imageUrl: schema.items.imageUrl, qty: schema.orderLines.qty, price: schema.orderLines.price })
       .from(schema.orderLines).innerJoin(schema.items, eq(schema.items.id, schema.orderLines.itemId)).where(eq(schema.orderLines.orderId, id)),
     getBrandings(),
     getBrandByName(forceBrand || o.pageName),
@@ -94,15 +94,23 @@ export default async function OrderDetail({
             <tr><th style={{ width: "8%" }}>Sl.</th><th>Item</th><th>Qty</th><th>Price (৳)</th><th>Total (৳)</th></tr>
           </thead>
           <tbody>
-            {lines.map((l, idx) => (
+            {lines.map((l, idx) => {
+              const imgUrl = normalizeLogoUrl(l.imageUrl);
+              return (
               <tr key={l.id}>
                 <td>{idx + 1}</td>
-                <td><b>{l.name}</b>{l.size ? ` (${l.size})` : ""}<br /><small style={{ color: "var(--muted)" }}>SKU: {l.sku}</small></td>
+                <td>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    {imgUrl && <img src={imgUrl} alt={l.name} style={{ width: 44, height: 44, objectFit: "cover", borderRadius: 6, border: "1px solid var(--line)", flexShrink: 0 }} />}
+                    <div><b>{l.name}</b>{l.size ? ` (${l.size})` : ""}<br /><small style={{ color: "var(--muted)" }}>SKU: {l.sku}</small></div>
+                  </div>
+                </td>
                 <td>{fmt(l.qty)}</td>
                 <td>৳ {fmt(l.price)}</td>
                 <td>৳ {fmt(l.qty * l.price)}</td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
           <tfoot>
             <tr><td colSpan={4} align="right">Subtotal</td><td>৳ {fmt(subtotal)}</td></tr>

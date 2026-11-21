@@ -1,5 +1,5 @@
 import {
-  mysqlTable, int, varchar, text, decimal, timestamp, date, uniqueIndex, index,
+  mysqlTable, int, varchar, text, mediumtext, decimal, timestamp, date, uniqueIndex, index,
 } from "drizzle-orm/mysql-core";
 
 const money = (name: string) => decimal(name, { precision: 12, scale: 2, mode: "number" }).notNull().default(0);
@@ -54,7 +54,7 @@ export const items = mysqlTable("items", {
   purchasePrice: money("purchase_price"),
   salePrice: money("sale_price"),
   reorderLevel: int("reorder_level").notNull().default(5),
-  imageUrl: varchar("image_url", { length: 500 }).notNull().default(""),
+  imageUrl: mediumtext("image_url"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => [uniqueIndex("items_sku_uq").on(t.sku)]);
 
