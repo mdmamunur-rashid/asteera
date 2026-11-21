@@ -62,7 +62,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           <tbody>
             {brands.map((b) => (
               <tr key={b.id}>
-                <td>{b.logoUrl ? <img src={b.logoUrl} alt={b.name} style={{ maxHeight: 40, maxWidth: 100, objectFit: "contain" }} /> : "—"}</td>
+                <td>{b.logoUrl ? <img src={b.logoUrl} alt={b.name} style={{ maxHeight: 64, maxWidth: 160, objectFit: "contain" }} /> : "—"}</td>
                 <td><b>{b.name}</b></td>
                 <td>{b.phone}<br /><small style={{ whiteSpace: "pre-line" }}>{b.address}</small></td>
                 <td>

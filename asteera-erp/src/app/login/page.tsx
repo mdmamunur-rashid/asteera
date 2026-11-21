@@ -8,7 +8,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   return (
     <form action={login} className="login">
       {brand.logoUrl && (
-        <img src={brand.logoUrl} alt={brand.name} style={{ maxHeight: 56, maxWidth: 180, objectFit: "contain", display: "block", margin: "0 auto 12px" }} />
+        <img src={brand.logoUrl} alt={brand.name} style={{ maxHeight: 96, maxWidth: 260, objectFit: "contain", display: "block", margin: "0 auto 14px" }} />
       )}
       <h2>{brand.name} ERP</h2>
       {error && <div className="err">{error}</div>}

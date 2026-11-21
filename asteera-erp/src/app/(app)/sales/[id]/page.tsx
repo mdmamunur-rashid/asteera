@@ -37,7 +37,7 @@ export default async function OrderDetail({
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
         <div>
           {activeBrand.logoUrl && (
-            <img src={activeBrand.logoUrl} alt={activeBrand.name} style={{ maxHeight: 56, maxWidth: 180, objectFit: "contain", marginBottom: 6 }} />
+            <img src={activeBrand.logoUrl} alt={activeBrand.name} style={{ maxHeight: 84, maxWidth: 240, objectFit: "contain", marginBottom: 8 }} />
           )}
           <h2 style={{ margin: 0 }}>{activeBrand.name} — Invoice {o.invoiceNo}</h2>
           {activeBrand.address && <small style={{ whiteSpace: "pre-line", color: "var(--muted)" }}>{activeBrand.address}</small>}

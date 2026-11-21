@@ -26,7 +26,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       <nav className="side">
         <div style={{ padding: "0 20px 14px" }}>
           {brand.logoUrl && (
-            <img src={brand.logoUrl} alt={brand.name} style={{ maxHeight: 42, maxWidth: 160, objectFit: "contain", display: "block", marginBottom: 6, background: "#fff", padding: 4, borderRadius: 6 }} />
+            <img src={brand.logoUrl} alt={brand.name} style={{ width: "100%", maxHeight: 72, objectFit: "contain", display: "block", marginBottom: 8, background: "#fff", padding: 6, borderRadius: 8 }} />
           )}
           <h1 style={{ margin: 0 }}>{brand.name}</h1>
           <small style={{ color: standalone ? "#86efac" : "#fde68a", fontSize: 11 }}>

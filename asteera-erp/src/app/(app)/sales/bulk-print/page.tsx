@@ -38,7 +38,7 @@ export default async function BulkPrintSales({ searchParams }: { searchParams: P
         const lines = allLines.filter((l) => l.orderId === o.id);
         return (
           <div key={o.id} className="invoice" style={{ marginBottom: 24, pageBreakAfter: "always", borderBottom: "1px dashed #ccc" }}>
-            {activeBrand.logoUrl && <img src={activeBrand.logoUrl} alt={activeBrand.name} style={{ maxHeight: 48, objectFit: "contain" }} />}
+            {activeBrand.logoUrl && <img src={activeBrand.logoUrl} alt={activeBrand.name} style={{ maxHeight: 76, maxWidth: 220, objectFit: "contain" }} />}
             <h3 style={{ margin: "4px 0" }}>{activeBrand.name} — Invoice {o.invoiceNo}</h3>
             <p>Date: {o.date} · <b>{o.customerName}</b> ({o.phone})<br />{o.address}</p>
             <table><thead><tr><th>SKU</th><th>Item</th><th>Qty</th><th>Price</th><th>Amount</th></tr></thead>
