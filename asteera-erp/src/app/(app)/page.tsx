@@ -26,13 +26,13 @@ export default async function Dashboard() {
   return (
     <>
       <h2>Dashboard</h2>
-      <div className="grid">
-        <div className="stat"><b>{fmt(salesRow[0].t)}</b><span>Sales this month ({salesRow[0].c} invoices)</span></div>
-        <div className="stat"><b>{fmt(Number(salesRow[0].t) - Number(salesRow[0].paid))}</b><span>Receivable this month</span></div>
-        <div className="stat"><b>{fmt(expRow[0].t)}</b><span>Expenses this month</span></div>
-        <div className="stat"><b>{fmt(stockValue)}</b><span>Stock value (at cost)</span></div>
-        <div className="stat"><b>{fmt(poOwed)}</b><span>Owed on purchase orders</span></div>
-        <div className="stat"><b>{fmt(ledgerRow[0].due)}</b><span>Owed to production suppliers</span></div>
+      <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" }}>
+        <div className="stat c-green"><b>৳ {fmt(salesRow[0].t)}</b><span>Sales this month ({salesRow[0].c} invoices)</span></div>
+        <div className="stat c-blue"><b>৳ {fmt(Number(salesRow[0].t) - Number(salesRow[0].paid))}</b><span>Receivable this month</span></div>
+        <div className="stat c-rose"><b>৳ {fmt(expRow[0].t)}</b><span>Expenses this month</span></div>
+        <div className="stat c-teal"><b>৳ {fmt(stockValue)}</b><span>Stock value (at cost)</span></div>
+        <div className="stat c-amber"><b>৳ {fmt(poOwed)}</b><span>Owed on purchase orders</span></div>
+        <div className="stat c-violet"><b>৳ {fmt(ledgerRow[0].due)}</b><span>Owed to production suppliers</span></div>
       </div>
       <div className="card">
         <h3>Orders by status</h3>

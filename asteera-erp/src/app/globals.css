@@ -21,9 +21,15 @@ a { color: #d97706; text-decoration: none; }
 h2 { margin:0 0 16px; color:var(--primary-dark); font-weight:700; }
 .card { background:#fff; border:1px solid var(--line); border-radius:10px; padding:16px; margin-bottom:16px; box-shadow:0 1px 2px rgba(0,0,0,.04); overflow-x:auto; }
 .grid { display:grid; grid-template-columns: repeat(auto-fit,minmax(200px,1fr)); gap:12px; margin-bottom:16px; }
-.stat { background:#fff; border:1px solid var(--line); border-radius:10px; padding:16px; box-shadow:0 1px 2px rgba(0,0,0,.04); }
+.stat { background:#fff; border:1px solid var(--line); border-left:4px solid var(--primary); border-radius:10px; padding:16px; box-shadow:0 1px 2px rgba(0,0,0,.04); }
 .stat b { display:block; font-size:24px; color:var(--primary); }
 .stat span { color:var(--muted); font-size:13px; }
+.stat.c-green { background:#ecfdf5; border-left-color:#10b981; } .stat.c-green b { color:#047857; }
+.stat.c-blue { background:#eff6ff; border-left-color:#3b82f6; } .stat.c-blue b { color:#1d4ed8; }
+.stat.c-rose { background:#fff1f2; border-left-color:#f43f5e; } .stat.c-rose b { color:#be123c; }
+.stat.c-teal { background:#f0fdfa; border-left-color:#008080; } .stat.c-teal b { color:#005a5a; }
+.stat.c-amber { background:#fff7ed; border-left-color:#ff8c00; } .stat.c-amber b { color:#c2410c; }
+.stat.c-violet { background:#f5f3ff; border-left-color:#8b5cf6; } .stat.c-violet b { color:#6d28d9; }
 table { width:100%; border-collapse:collapse; font-size:13.5px; }
 th, td { padding:9px 10px; border-bottom:1px solid var(--line); text-align:left; vertical-align:middle; }
 th { color:var(--muted); font-weight:600; font-size:12px; text-transform:uppercase; background:#f9fafb; }
