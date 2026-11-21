@@ -1,0 +1,6 @@
+---
+deployment:
+  tasks:
+    - /bin/tar -xzf /home/innerspinbd/asteera/asteera-erp/next-build.tar.gz -C /home/innerspinbd/asteera/asteera-erp
+    - /bin/mkdir -p /home/innerspinbd/asteera/asteera-erp/tmp
+    - /bin/touch /home/innerspinbd/asteera/asteera-erp/tmp/restart.txt
