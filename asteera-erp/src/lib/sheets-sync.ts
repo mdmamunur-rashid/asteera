@@ -32,9 +32,14 @@ async function fetchSheetTab(sheetId: string, tabName: string): Promise<string[]
   if (!sheetId) return [];
   const url = `https://docs.google.com/spreadsheets/d/${encodeURIComponent(sheetId)}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tabName)}`;
   const res = await fetch(url, { cache: "no-store" });
+  if (res.status === 401 || res.status === 403) {
+    throw new Error(`Google Sheet "${sheetId}" is private (HTTP ${res.status}). Temporarily set Share -> "Anyone with the link can view", sync, then switch back to Restricted.`);
+  }
   if (!res.ok) return [];
   const text = await res.text();
-  if (text.trim().startsWith("<!DOCTYPE")) return [];
+  if (text.trim().startsWith("<!DOCTYPE")) {
+    throw new Error(`Google Sheet "${sheetId}" requires sign-in. Temporarily set Share -> "Anyone with the link can view" to sync.`);
+  }
   return parseCsv(text);
 }
 
@@ -65,7 +70,8 @@ export async function syncFromGoogleSheets(): Promise<SyncResult> {
     return { ok: false, message: "No Google Spreadsheet IDs configured.", counts };
   }
 
-  if (invId) {
+  try {
+    if (invId) {
     // 1. Brandings
     const bRows = await fetchSheetTab(invId, "Brandings");
     for (let i = 1; i < bRows.length; i++) {
@@ -206,7 +212,10 @@ export async function syncFromGoogleSheets(): Promise<SyncResult> {
 
   return {
     ok: true,
-    message: `Synced from Google Sheets (Users: ${counts.users}, Items: ${counts.items}, Suppliers: ${counts.suppliers}, Brands: ${counts.brandings}, Expenses: ${counts.expenses}, Orders: ${counts.orders}). Note: spreadsheets must be shared as "Anyone with the link can view" for CSV sync.`,
+    message: `Synced from Google Sheets (Users: ${counts.users}, Items: ${counts.items}, Suppliers: ${counts.suppliers}, Brands: ${counts.brandings}, Expenses: ${counts.expenses}, Orders: ${counts.orders}).`,
     counts,
   };
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : "Sync failed", counts };
+  }
 }
