@@ -1,9 +1,10 @@
 import { redirect } from "next/navigation";
 import { canAccess, requireSession } from "@/lib/auth";
 import { getBrandings, getSettingsMap } from "@/lib/settings";
+import SignatureInput from "@/components/SignatureInput";
 import {
   deleteBranding, makeStandalone, reconnectSheets, runSheetSync,
-  saveBranding, saveIntegrations, saveSheetConfig, setDefaultBrand,
+  saveBranding, saveIntegrations, saveSheetConfig, saveSignature, setDefaultBrand,
 } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -83,7 +84,19 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         </table>
       </div>
 
-      {/* 3. Courier & SMS Credentials */}
+      {/* 3. Invoice Authorized Signature */}
+      <div className="card">
+        <h3>Invoice Authorized Signature</h3>
+        <p style={{ fontSize: 13, color: "var(--muted)", marginTop: 0 }}>
+          Upload or paste a signature image for invoices. Leave blank to keep the signature line empty for manual signing.
+        </p>
+        <form action={saveSignature}>
+          <SignatureInput initialUrl={cfg.authorized_signature_url ?? ""} />
+          <button className="btn" style={{ marginTop: 10 }}>Save Signature</button>
+        </form>
+      </div>
+
+      {/* 4. Courier & SMS Credentials */}
       <div className="card">
         <h3>Courier (Steadfast / Pathao) &amp; SMS Settings</h3>
         <form action={saveIntegrations} className="form">

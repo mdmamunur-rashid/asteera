@@ -1,7 +1,7 @@
 "use server";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { eq, isNull, sql } from "drizzle-orm";
+import { eq, inArray, isNull, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { requireSession } from "@/lib/auth";
 import { dispatchPathao, dispatchSteadfast } from "@/lib/integrations";
@@ -83,6 +83,35 @@ export async function sendToPathao(f: FormData) {
   const res = await dispatchPathao(id);
   revalidatePath(`/sales/${id}`);
   redirect(`/sales/${id}?${res.ok ? "ok" : "error"}=${encodeURIComponent(res.message)}`);
+}
+
+export async function bulkOrderAction(f: FormData) {
+  await requireSession();
+  const ids = f.getAll("ids").map(Number).filter((n) => n > 0);
+  const action = str(f, "bulkAction");
+  if (ids.length === 0 || !action) redirect("/sales?error=Select+orders+and+an+action");
+
+  if (action === "print") {
+    redirect(`/sales/bulk-print?ids=${ids.join(",")}`);
+  }
+  if (action === "steadfast") {
+    let okCount = 0;
+    for (const id of ids) { if ((await dispatchSteadfast(id)).ok) okCount++; }
+    revalidatePath("/sales");
+    redirect(`/sales?ok=${encodeURIComponent(`Sent ${okCount}/${ids.length} to Steadfast`)}`);
+  }
+  if (action === "pathao") {
+    let okCount = 0;
+    for (const id of ids) { if ((await dispatchPathao(id)).ok) okCount++; }
+    revalidatePath("/sales");
+    redirect(`/sales?ok=${encodeURIComponent(`Sent ${okCount}/${ids.length} to Pathao`)}`);
+  }
+  if (ORDER_STATUSES.includes(action)) {
+    await db.update(schema.orders).set({ status: action }).where(inArray(schema.orders.id, ids));
+    revalidatePath("/sales");
+    redirect(`/sales?ok=${encodeURIComponent(`Updated ${ids.length} order(s) to ${action}`)}`);
+  }
+  redirect("/sales");
 }
 
 export async function processReturn(f: FormData) {

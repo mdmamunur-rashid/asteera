@@ -98,3 +98,11 @@ export async function saveIntegrations(f: FormData) {
   revalidatePath("/settings");
   redirect("/settings?ok=Courier+and+SMS+settings+saved");
 }
+
+export async function saveSignature(f: FormData) {
+  await requireSettingsAccess();
+  await setSetting("authorized_signature_url", str(f, "authorized_signature_url"));
+  revalidatePath("/settings");
+  revalidatePath("/sales");
+  redirect("/settings?ok=Invoice+signature+updated");
+}

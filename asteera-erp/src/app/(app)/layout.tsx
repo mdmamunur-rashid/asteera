@@ -24,24 +24,37 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   return (
     <div className="shell">
       <nav className="side">
-        <div style={{ padding: "0 20px 14px" }}>
+        <div className="side-brand">
           {brand.logoUrl && (
-            <img src={brand.logoUrl} alt={brand.name} style={{ width: "100%", maxHeight: 72, objectFit: "contain", display: "block", marginBottom: 8, background: "#fff", padding: 6, borderRadius: 8 }} />
+            <img src={brand.logoUrl} alt={brand.name} style={{ width: "100%", maxHeight: 72, objectFit: "contain", display: "block" }} />
           )}
-          <h1 style={{ margin: 0 }}>{brand.name}</h1>
-          <small style={{ color: standalone ? "#86efac" : "#fde68a", fontSize: 11 }}>
+          <h1>{brand.name}</h1>
+          <span className={`badge ${standalone ? "ok" : "warn"}`}>
             {standalone ? "Standalone Mode" : "Sheet Sync Ready"}
-          </small>
+          </span>
         </div>
         {NAV.filter(([, , mod]) => canAccess(s, mod)).map(([href, label]) => (
           <Link key={href} href={href}>{label}</Link>
         ))}
-        <form action={logout}>
-          <small>{s?.name} ({s?.role})</small><br />
-          <button className="btn danger" style={{ marginTop: 6 }}>Log out</button>
-        </form>
+        <div className="side-foot">
+          <b>{s?.name}</b> · <span>{s?.role}</span>
+          <form action={logout} style={{ marginTop: 8 }}>
+            <button className="btn danger" style={{ width: "100%" }}>Log out</button>
+          </form>
+        </div>
       </nav>
-      <main className="main">{children}</main>
+      <div className="main-wrap">
+        <header className="topbar">
+          <div style={{ fontSize: 13, color: "var(--muted)" }}>
+            <b>{brand.name} ERP</b> {brand.phone ? `· ${brand.phone}` : ""}
+          </div>
+          <div className="toolbar" style={{ marginBottom: 0 }}>
+            <Link href="/sales/new" className="btn" style={{ padding: "6px 12px", fontSize: 12.5 }}>+ New Order</Link>
+            <Link href="/sales/bulk-print" className="btn secondary" style={{ padding: "6px 12px", fontSize: 12.5 }}>Bulk Print</Link>
+          </div>
+        </header>
+        <main className="main">{children}</main>
+      </div>
     </div>
   );
 }
