@@ -1,0 +1,24 @@
+name: Deploy to cPanel
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pull latest main in cPanel Git Version Control
+        run: |
+          curl -fsS -H "Authorization: cpanel innerspinbd:${{ secrets.CPANEL_API_TOKEN }}" \
+            --get --data-urlencode "repository_root=/home/innerspinbd/asteera" \
+            "https://s1304.sgp1.mysecurecloudhost.com:2083/execute/VersionControl/update"
+
+      - name: Trigger Passenger restart (tmp/restart.txt)
+        run: |
+          curl -fsS -X POST -H "Authorization: cpanel innerspinbd:${{ secrets.CPANEL_API_TOKEN }}" \
+            --data-urlencode "dir=/home/innerspinbd/asteera/asteera-erp/tmp" \
+            --data-urlencode "file=restart.txt" \
+            --data-urlencode "content=${{ github.sha }}" \
+            "https://s1304.sgp1.mysecurecloudhost.com:2083/execute/Fileman/save_file_content"
