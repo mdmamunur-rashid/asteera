@@ -9,7 +9,8 @@
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
-    "create-admin": "tsx --env-file=.env scripts/create-admin.ts"
+    "create-admin": "tsx --env-file=.env scripts/create-admin.ts",
+    "cpanel:setup": "node scripts/cpanel-setup.mjs"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
