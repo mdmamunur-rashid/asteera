@@ -11,9 +11,37 @@ export const users = mysqlTable("users", {
   email: varchar("email", { length: 160 }),
   phone: varchar("phone", { length: 30 }),
   passwordHash: varchar("password_hash", { length: 100 }).notNull(),
-  role: varchar("role", { length: 20 }).notNull().default("staff"), // admin | staff
+  role: varchar("role", { length: 20 }).notNull().default("staff"), // admin | staff | moderator | user
+  photoUrl: varchar("photo_url", { length: 500 }).notNull().default(""),
+  status: varchar("status", { length: 20 }).notNull().default("Active"), // Active | Inactive
+  permissions: text("permissions"), // JSON array of allowed module keys
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => [uniqueIndex("users_email_uq").on(t.email), uniqueIndex("users_phone_uq").on(t.phone)]);
+
+export const brandings = mysqlTable("brandings", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 120 }).notNull(),
+  address: text("address"),
+  logoUrl: varchar("logo_url", { length: 500 }).notNull().default(""),
+  phone: varchar("phone", { length: 40 }).notNull().default(""),
+  isDefault: int("is_default").notNull().default(0),
+}, (t) => [uniqueIndex("brandings_name_uq").on(t.name)]);
+
+export const settings = mysqlTable("settings", {
+  k: varchar("k", { length: 80 }).primaryKey(),
+  v: text("v").notNull(),
+});
+
+export const orderReturns = mysqlTable("order_returns", {
+  id: int("id").autoincrement().primaryKey(),
+  orderId: int("order_id").notNull(),
+  invoiceNo: varchar("invoice_no", { length: 30 }).notNull(),
+  returnType: varchar("return_type", { length: 20 }).notNull().default("Partial"),
+  itemsJson: text("items_json").notNull(),
+  returnCost: money("return_cost"),
+  note: varchar("note", { length: 300 }).notNull().default(""),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => [index("ret_order_idx").on(t.orderId)]);
 
 /** Replaces the "InventoryItems" sheet. Stock is computed, never stored. */
 export const items = mysqlTable("items", {

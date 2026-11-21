@@ -20,18 +20,21 @@ export default async function Sales({ searchParams }: { searchParams: Promise<{ 
       <h2>Sales / Orders</h2>
       <div className="toolbar">
         <Link className="btn" href="/sales/new">+ New order / invoice</Link>
-        <form className="toolbar">
+        <Link className="btn secondary" href="/sales/bulk-print">Bulk Print Unprinted</Link>
+        <form className="toolbar" style={{ marginBottom: 0 }}>
           <input name="q" placeholder="Invoice / name / phone" defaultValue={q} />
           <select name="status" defaultValue={status ?? ""}><option value="">All statuses</option>{ORDER_STATUSES.map((s) => <option key={s}>{s}</option>)}</select>
           <button className="btn secondary">Filter</button>
         </form>
       </div>
       <div className="card">
-        <table><thead><tr><th>Invoice</th><th>Date</th><th>Customer</th><th>Phone</th><th>Status</th><th>Total</th><th>Paid</th><th>Due</th></tr></thead>
+        <table><thead><tr><th>Invoice</th><th>Date</th><th>Customer</th><th>Phone</th><th>Status</th><th>Courier</th><th>Total</th><th>Paid</th><th>Due</th></tr></thead>
           <tbody>{rows.map((o) => (
             <tr key={o.id}>
               <td><Link href={`/sales/${o.id}`}>{o.invoiceNo}</Link></td><td>{o.date}</td><td>{o.customerName}</td><td>{o.phone}</td>
-              <td><span className="badge">{o.status}</span></td><td>{fmt(o.total)}</td><td>{fmt(o.paid)}</td><td>{fmt(o.total - o.paid)}</td>
+              <td><span className="badge">{o.status}</span></td>
+              <td>{o.courier ? `${o.courier} (${o.trackingNo})` : "—"}</td>
+              <td>{fmt(o.total)}</td><td>{fmt(o.paid)}</td><td>{fmt(o.total - o.paid)}</td>
             </tr>
           ))}</tbody></table>
       </div>

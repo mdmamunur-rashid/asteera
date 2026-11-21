@@ -1,23 +1,43 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { getSession } from "@/lib/auth";
+import { canAccess, getSession } from "@/lib/auth";
+import { getDefaultBrand, isStandaloneMode } from "@/lib/settings";
 import { logout } from "../login/actions";
 
-const NAV = [
-  ["/", "Dashboard"], ["/inventory", "Inventory"], ["/suppliers", "Suppliers"], ["/purchases", "Purchases"],
-  ["/sales", "Sales / Orders"], ["/expenses", "Expenses"], ["/production", "Production"],
-  ["/fabrics", "Fabric stock"], ["/ledger", "Supplier ledger"],
+const NAV: [string, string, string][] = [
+  ["/", "Dashboard", "dashboard"],
+  ["/inventory", "Inventory", "inventory"],
+  ["/suppliers", "Suppliers", "suppliers"],
+  ["/purchases", "Purchases", "purchases"],
+  ["/sales", "Sales / Orders", "sales"],
+  ["/expenses", "Expenses", "expenses"],
+  ["/production", "Production", "production"],
+  ["/fabrics", "Fabric stock", "fabrics"],
+  ["/ledger", "Supplier ledger", "ledger"],
+  ["/users", "Users & Roles", "users"],
+  ["/settings", "Settings & Sync", "settings"],
+  ["/profile", "My Profile", "profile"],
 ];
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
-  const s = await getSession();
+  const [s, brand, standalone] = await Promise.all([getSession(), getDefaultBrand(), isStandaloneMode()]);
   return (
     <div className="shell">
       <nav className="side">
-        <h1>{process.env.BRAND_NAME ?? "Asteera"}</h1>
-        {NAV.map(([href, label]) => <Link key={href} href={href}>{label}</Link>)}
+        <div style={{ padding: "0 20px 14px" }}>
+          {brand.logoUrl && (
+            <img src={brand.logoUrl} alt={brand.name} style={{ maxHeight: 42, maxWidth: 160, objectFit: "contain", display: "block", marginBottom: 6, background: "#fff", padding: 4, borderRadius: 6 }} />
+          )}
+          <h1 style={{ margin: 0 }}>{brand.name}</h1>
+          <small style={{ color: standalone ? "#86efac" : "#fde68a", fontSize: 11 }}>
+            {standalone ? "Standalone Mode" : "Sheet Sync Ready"}
+          </small>
+        </div>
+        {NAV.filter(([, , mod]) => canAccess(s, mod)).map(([href, label]) => (
+          <Link key={href} href={href}>{label}</Link>
+        ))}
         <form action={logout}>
-          <small>{s?.name}</small><br />
+          <small>{s?.name} ({s?.role})</small><br />
           <button className="btn danger" style={{ marginTop: 6 }}>Log out</button>
         </form>
       </nav>

@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import bcrypt from "bcryptjs";
 import { eq, or } from "drizzle-orm";
 import { db, schema } from "@/db";
-import { createSession, destroySession } from "@/lib/auth";
+import { createSession, destroySession, resolvePermissions } from "@/lib/auth";
 import { str } from "@/lib/util";
 
 export async function login(formData: FormData) {
@@ -17,10 +17,15 @@ export async function login(formData: FormData) {
     .where(or(eq(schema.users.email, id), eq(schema.users.phone, id)))
     .limit(1);
 
-  // Same message for unknown user / wrong password (no account enumeration).
   if (!u || !(await bcrypt.compare(password, u.passwordHash))) redirect("/login?error=Invalid+credentials");
+  if (u.status && u.status.toLowerCase() !== "active") redirect("/login?error=Account+is+inactive");
 
-  await createSession({ uid: u.id, name: u.name, role: u.role });
+  await createSession({
+    uid: u.id,
+    name: u.name,
+    role: u.role,
+    permissions: resolvePermissions(u.role, u.permissions),
+  });
   redirect("/");
 }
 

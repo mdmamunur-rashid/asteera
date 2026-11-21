@@ -3,7 +3,7 @@ import { jwtVerify } from "jose";
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
-  if (pathname.startsWith("/login")) return NextResponse.next();
+  if (pathname.startsWith("/login") || pathname.startsWith("/api/webhooks/")) return NextResponse.next();
 
   const token = req.cookies.get("asteera_session")?.value;
   if (token) {

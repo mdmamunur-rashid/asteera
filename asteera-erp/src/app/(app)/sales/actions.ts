@@ -1,9 +1,10 @@
 "use server";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { eq, sql } from "drizzle-orm";
+import { eq, isNull, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { requireSession } from "@/lib/auth";
+import { dispatchPathao, dispatchSteadfast } from "@/lib/integrations";
 import { nextInvoiceNo } from "@/lib/queries";
 import { num, ORDER_STATUSES, parseLines, str, today } from "@/lib/util";
 
@@ -59,4 +60,83 @@ export async function markPrinted(f: FormData) {
   const id = Number(f.get("id"));
   await db.update(schema.orders).set({ printedAt: sql`NOW()` }).where(eq(schema.orders.id, id));
   redirect(`/sales/${id}`);
+}
+
+export async function markAllUnprinted() {
+  await requireSession();
+  await db.update(schema.orders).set({ printedAt: sql`NOW()` }).where(isNull(schema.orders.printedAt));
+  revalidatePath("/sales/bulk-print");
+  redirect("/sales/bulk-print?ok=Marked+all+as+printed");
+}
+
+export async function sendToSteadfast(f: FormData) {
+  await requireSession();
+  const id = Number(f.get("id"));
+  const res = await dispatchSteadfast(id);
+  revalidatePath(`/sales/${id}`);
+  redirect(`/sales/${id}?${res.ok ? "ok" : "error"}=${encodeURIComponent(res.message)}`);
+}
+
+export async function sendToPathao(f: FormData) {
+  await requireSession();
+  const id = Number(f.get("id"));
+  const res = await dispatchPathao(id);
+  revalidatePath(`/sales/${id}`);
+  redirect(`/sales/${id}?${res.ok ? "ok" : "error"}=${encodeURIComponent(res.message)}`);
+}
+
+export async function processReturn(f: FormData) {
+  await requireSession();
+  const id = Number(f.get("id"));
+  const returnType = str(f, "returnType") === "Full" ? "Full" : "Partial";
+  const returnCost = num(f, "returnCost");
+  const note = str(f, "note");
+
+  const [o] = await db.select().from(schema.orders).where(eq(schema.orders.id, id)).limit(1);
+  if (!o) redirect("/sales");
+  const lines = await db.select().from(schema.orderLines).where(eq(schema.orderLines.orderId, id));
+
+  const returnedItems: { lineId: number; itemId: number; qty: number }[] = [];
+  if (returnType === "Full") {
+    for (const l of lines) {
+      returnedItems.push({ lineId: l.id, itemId: l.itemId, qty: l.qty });
+    }
+    await db.transaction(async (tx) => {
+      await tx.update(schema.orderLines).set({ qty: 0 }).where(eq(schema.orderLines.orderId, id));
+      await tx.update(schema.orders).set({
+        status: "Returned",
+        returnCost: o.returnCost + returnCost,
+        total: returnCost,
+      }).where(eq(schema.orders.id, id));
+      await tx.insert(schema.orderReturns).values({
+        orderId: id, invoiceNo: o.invoiceNo, returnType: "Full",
+        itemsJson: JSON.stringify(returnedItems), returnCost, note,
+      });
+    });
+  } else {
+    const lineId = Number(f.get("lineId"));
+    const retQty = num(f, "returnQty");
+    const target = lines.find((l) => l.id === lineId);
+    if (!target || retQty <= 0) redirect(`/sales/${id}?error=Select+line+and+return+quantity`);
+    const actualRet = Math.min(target.qty, retQty);
+    const newQty = Math.max(0, target.qty - actualRet);
+    returnedItems.push({ lineId: target.id, itemId: target.itemId, qty: actualRet });
+
+    await db.transaction(async (tx) => {
+      await tx.update(schema.orderLines).set({ qty: newQty }).where(eq(schema.orderLines.id, target.id));
+      const newSubtotal = lines.reduce((sum, l) => sum + (l.id === target.id ? newQty : l.qty) * l.price, 0);
+      const newTotal = Math.max(0, newSubtotal + o.deliveryCharge - o.discount + o.returnCost + returnCost);
+      await tx.update(schema.orders).set({
+        returnCost: o.returnCost + returnCost,
+        total: newTotal,
+      }).where(eq(schema.orders.id, id));
+      await tx.insert(schema.orderReturns).values({
+        orderId: id, invoiceNo: o.invoiceNo, returnType: "Partial",
+        itemsJson: JSON.stringify(returnedItems), returnCost, note,
+      });
+    });
+  }
+
+  revalidatePath(`/sales/${id}`);
+  redirect(`/sales/${id}?ok=Return+processed`);
 }
