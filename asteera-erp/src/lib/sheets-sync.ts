@@ -1,5 +1,7 @@
+import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/db";
+import { ALL_MODULES, resolvePermissions } from "./auth";
 import { getSettingsMap } from "./settings";
 
 /** Minimal RFC-4180 CSV parser handling quoted fields and embedded newlines. */
@@ -57,14 +59,14 @@ export async function syncFromGoogleSheets(): Promise<SyncResult> {
 
   const invId = s.inv_sheet_id || "";
   const ordId = s.order_sheet_id || "";
-  const counts: Record<string, number> = { items: 0, suppliers: 0, brandings: 0, expenses: 0, orders: 0 };
+  const counts: Record<string, number> = { users: 0, items: 0, suppliers: 0, brandings: 0, expenses: 0, orders: 0 };
 
   if (!invId && !ordId) {
     return { ok: false, message: "No Google Spreadsheet IDs configured.", counts };
   }
 
-  // 1. Brandings
   if (invId) {
+    // 1. Brandings
     const bRows = await fetchSheetTab(invId, "Brandings");
     for (let i = 1; i < bRows.length; i++) {
       const [name, address, logoUrl, phone] = bRows[i];
@@ -114,9 +116,56 @@ export async function syncFromGoogleSheets(): Promise<SyncResult> {
         counts.expenses++;
       }
     }
+
+    // 5. RoleManagement & Users: Email(0), Phone(1), Name(2), Photo(3), Role(4), Password(5), Status(6)
+    const roleMap: Record<string, string[]> = {};
+    const rmRows = await fetchSheetTab(invId, "RoleManagement");
+    if (rmRows.length > 0) {
+      const roleHeaders = rmRows[0].map((h) => h.trim().toLowerCase());
+      for (const rh of roleHeaders) if (rh) roleMap[rh] = [];
+      for (let i = 1; i < rmRows.length; i++) {
+        for (let c = 0; c < roleHeaders.length; c++) {
+          const rh = roleHeaders[c];
+          let mod = (rmRows[i][c] || "").trim().toLowerCase();
+          if (mod === "expences") mod = "expenses";
+          if (mod === "orders") mod = "sales";
+          if (rh && mod && (ALL_MODULES as readonly string[]).includes(mod) && !roleMap[rh].includes(mod)) {
+            roleMap[rh].push(mod);
+          }
+        }
+      }
+    }
+
+    const uRows = await fetchSheetTab(invId, "Users");
+    for (let i = 1; i < uRows.length; i++) {
+      const r = uRows[i];
+      const email = (r[0] || "").trim() || null;
+      const phone = (r[1] || "").trim() || null;
+      const name = (r[2] || "").trim();
+      const photoUrl = (r[3] || "").trim();
+      const role = ((r[4] || "employee").trim().toLowerCase()) || "employee";
+      const rawPass = String(r[5] || "Asteera123!");
+      const status = (r[6] || "Active").trim() || "Active";
+      if (!name || (!email && !phone)) continue;
+
+      const perms = roleMap[role]?.length ? roleMap[role] : resolvePermissions(role, null);
+      const [existing] = email
+        ? await db.select({ id: schema.users.id }).from(schema.users).where(eq(schema.users.email, email)).limit(1)
+        : [];
+      if (existing) {
+        await db.update(schema.users).set({ name, photoUrl, role, status, permissions: JSON.stringify(perms) }).where(eq(schema.users.id, existing.id));
+      } else {
+        await db.insert(schema.users).values({
+          name, email, phone, photoUrl, role, status,
+          permissions: JSON.stringify(perms),
+          passwordHash: await bcrypt.hash(rawPass, 10),
+        });
+      }
+      counts.users++;
+    }
   }
 
-  // 5. SalesDetails from Order Sheet
+  // 6. SalesDetails from Order Sheet
   if (ordId) {
     const sdRows = await fetchSheetTab(ordId, "SalesDetails");
     const allItems = await db.select().from(schema.items);
@@ -157,7 +206,7 @@ export async function syncFromGoogleSheets(): Promise<SyncResult> {
 
   return {
     ok: true,
-    message: `Synced from Google Sheets (Items: ${counts.items}, Suppliers: ${counts.suppliers}, Brands: ${counts.brandings}, Expenses: ${counts.expenses}, Orders: ${counts.orders}). Note: spreadsheets must be shared as "Anyone with the link can view" for CSV sync.`,
+    message: `Synced from Google Sheets (Users: ${counts.users}, Items: ${counts.items}, Suppliers: ${counts.suppliers}, Brands: ${counts.brandings}, Expenses: ${counts.expenses}, Orders: ${counts.orders}). Note: spreadsheets must be shared as "Anyone with the link can view" for CSV sync.`,
     counts,
   };
 }
