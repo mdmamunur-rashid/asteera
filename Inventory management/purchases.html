@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <base target="_top">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .container { padding: 20px; font-family: sans-serif; }
+        .header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .btn { padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; color: white; background-color: #008080; }
+        .data-table { width: 100%; border-collapse: collapse; margin-top: 20px; background: white; }
+        .data-table th, .data-table td { padding: 12px; border-bottom: 1px solid #ddd; text-align: left; }
+        .po-row .row-actions { visibility: hidden; opacity: 0; transition: opacity 0.2s; }
+        .po-row:hover .row-actions { visibility: visible; opacity: 1; }
+        .controls-bar { display: flex; align-items: center; gap: 15px; background: #f1f3f4; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
+        .search-box { flex: 2; position: relative; }
+        .search-box input { width: 100%; padding: 10px 15px 10px 35px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
+        .search-box i { position: absolute; left: 12px; top: 12px; color: #999; }
+        .date-filter { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+        .date-filter input { padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
+        .switch-container { display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 600; white-space: nowrap; }
+        .printed-badge { background: #e0f2f1; color: #008080; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: bold; }
+        .pending-badge { background: #fff3e0; color: #e67e22; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: bold; }
+        .modal { display: none; position: fixed; z-index: 1001; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); }
+        .modal-content { background: white; margin: 2% auto; padding: 20px; width: 90%; border-radius: 8px; max-height: 90vh; overflow-y: auto; }
+        .form-row { display: flex; gap: 15px; margin-bottom: 15px; }
+        .form-group { flex: 1; }
+        .form-control { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        .item-quick-add { background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #ddd; }
+        .processing-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.8); z-index: 2000; justify-content: center; align-items: center; }
+        .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #008080; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header-row">
+        <h2>Purchase Orders</h2>
+        <div>
+            <button class="btn" style="background:#ff8c00; margin-right:10px;" onclick="processBulk()">
+                <i class="fas fa-print"></i> BULK PRINT PENDING
+            </button>
+            <button class="btn" onclick="openNewPOModal()">+ New Purchase Order</button>
+        </div>
+    </div>
+
+    <div class="controls-bar">
+        <div class="search-box">
+            <i class="fas fa-search"></i>
+            <input type="text" id="poSearchInput" placeholder="Search by PO ID, Supplier Name, SKU...">
+        </div>
+        <div class="date-filter">
+            <span>From:</span><input type="date" id="startDatePO">
+            <span>To:</span><input type="date" id="endDatePO">
+        </div>
+        <div class="switch-container">
+            <span>Show History</span>
+            <input type="checkbox" id="showPrintedPOToggle" style="width:20px; height:20px; cursor:pointer;">
+        </div>
+    </div>
+
+    <table class="data-table" id="poTable">
+        <thead><tr><th>Date</th><th>PO ID</th><th>Supplier Name</th><th>Total Amount</th><th>Paid</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody></tbody>
+    </table>
+</div>
+
+<div id="newPOModal" class="modal">
+    <div class="modal-content">
+        <h3 id="modalTitle">Create New Purchase Order</h3>
+        <input type="hidden" id="isEditMode" value="false">
+        <div class="form-row">
+            <div class="form-group"><label>PO ID</label><input type="text" id="poIdInput" class="form-control" readonly></div>
+            <div class="form-group">
+                <label>Supplier</label>
+                <input list="supplierList" id="supplierSelect" class="form-control" placeholder="Select or type Supplier...">
+                <datalist id="supplierList"></datalist>
+            </div>
+            <div class="form-group"><label>PO Date</label><input type="date" id="poDateInput" class="form-control"></div>
+        </div>
+        <div class="item-quick-add">
+            <h4>Quick Add Item</h4>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Select Item SKU</label>
+                    <input list="itemList" id="itemQuickSelect" class="form-control" placeholder="Search SKU..." onchange="handleSkuSelection(this.value)">
+                    <datalist id="itemList"></datalist>
+                </div>
+                <div class="form-group">
+                    <label>Product Name</label>
+                    <input type="text" id="autoProductName" class="form-control" readonly>
+                </div>
+                <div class="form-group">
+                    <label>Size</label>
+                    <select id="autoSizeSelect" class="form-control"></select>
+                </div>
+                <div class="form-group">
+                    <label>P.Price</label>
+                    <input type="number" id="autoPPrice" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label>QTY</label>
+                    <input type="number" id="autoQty" class="form-control" value="1">
+                </div>
+                <div class="form-group" style="flex:0; min-width:100px; align-self:flex-end;"><button class="btn" onclick="addItemFromQuickSelect()" style="width:100%">Add</button></div>
+            </div>
+        </div>
+        <table class="data-table" id="poItemsTable"><thead><tr><th>SKU</th><th>Item Name</th><th>Size</th><th>QTY</th><th>Unit Cost</th><th>Total</th><th>Action</th></tr></thead><tbody id="poItemsBody"></tbody></table>
+        <div style="text-align:right; margin-top:20px;"><button class="btn" style="background:#6c757d" onclick="closeModal('newPOModal')">Cancel</button><button class="btn" onclick="savePO()">Confirm Order</button></div>
+    </div>
+</div>
+
+<div id="processingOverlay" class="processing-overlay"><div class="spinner"></div></div>
+
+<script>
+    // Global State for this page
+    var pInventoryItems = [];
+    var pSuppliers = [];
+    var pAllPOs = [];
+    var pSizeList = [];
+
+    /**
+     * Called by template.html after loading the page
+     */
+    function initPurchases() {
+        console.log("Initializing Purchases Tab...");
+        loadPOList();
+        
+        $('#poSearchInput, #showPrintedPOToggle, #startDatePO, #endDatePO').on('input change', function() {
+            filterAndRenderPO();
+        });
+
+        google.script.run.withSuccessHandler(data => {
+            pSuppliers = data;
+            const list = $('#supplierList');
+            list.empty();
+            data.forEach(s => list.append(`<option value="${s.id}">(${s.id}) ${s.name}</option>`));
+        }).poGetSuppliers();
+
+        google.script.run.withSuccessHandler(data => { 
+            pInventoryItems = data; 
+            const list = $('#itemList');
+            list.empty();
+            data.forEach(item => list.append(`<option value="${item.id}">(${item.id}) ${item.name}</option>`));
+        }).poGetInventoryItems();
+
+        // Load sizes for the dropdown
+        google.script.run.withSuccessHandler(data => {
+            pSizeList = data;
+            const sel = $('#autoSizeSelect');
+            sel.empty().append('<option value="">Select Size...</option>');
+            data.forEach(s => sel.append(new Option(s, s)));
+        }).getSizeList();
+    }
+
+    function handleSkuSelection(sku) {
+        const item = pInventoryItems.find(i => i.id === sku);
+        if (item) {
+            $('#autoProductName').val(item.name);
+            $('#autoPPrice').val(item.pPrice);
+            if (item.size) $('#autoSizeSelect').val(item.size);
+        }
+    }
+
+    function showProcessing() { $('#processingOverlay').css('display', 'flex'); }
+    function hideProcessing() { $('#processingOverlay').hide(); }
+    function closeModal(id) { $('#' + id).hide(); }
+
+    function loadPOList() {
+        console.log("Loading PO List from server...");
+        showProcessing();
+        google.script.run.withSuccessHandler(data => {
+            console.log("PO Data received:", data ? data.length : 0, "items");
+            pAllPOs = data || [];
+            filterAndRenderPO();
+            hideProcessing();
+        }).withFailureHandler(err => {
+            console.error("Failed to load PO List:", err);
+            hideProcessing();
+            alert("Error loading POs: " + err.message);
+        }).poGetList();
+    }
+
+    function filterAndRenderPO() {
+        const query = $('#poSearchInput').val().toLowerCase();
+        const showAll = $('#showPrintedPOToggle').is(':checked');
+        const startStr = $('#startDatePO').val();
+        const endStr = $('#endDatePO').val();
+        
+        const start = startStr ? new Date(startStr + 'T00:00:00') : null;
+        const end = endStr ? new Date(endStr + 'T23:59:59') : null;
+
+        console.log("Filtering POs. Show History:", showAll, "Range:", startStr, "to", endStr);
+
+        const filtered = pAllPOs.filter(p => {
+            // If showAll is false, we only show items that are NOT printed
+            if (!showAll && p.isPrinted) return false;
+            
+            const pDate = parseSheetDate(p.date);
+            if (start && pDate < start) return false;
+            if (end && pDate > end) return false;
+            
+            if (!query) return true;
+            return p.poId.toLowerCase().includes(query) || p.supplierName.toLowerCase().includes(query);
+        });
+        
+        console.log("Rendering", filtered.length, "POs after filtering");
+        renderPOTable(filtered);
+    }
+
+    function renderPOTable(data) {
+        const tbody = $('#poTable tbody').empty();
+        if (!data || data.length === 0) { 
+            tbody.append('<tr><td colspan="7" style="text-align:center; padding:40px; color: #94a3b8;">No matching records found. Try checking "Show History".</td></tr>'); 
+            return; 
+        }
+        
+        data.forEach(r => {
+            const total = parseFloat(r.totalAmount) || 0;
+            const paid = parseFloat(r.totalPaid) || 0;
+            tbody.append(`<tr class="po-row">
+                <td data-label="Date">${r.date}</td>
+                <td data-label="PO ID"><strong>${r.poId}</strong></td>
+                <td data-label="Supplier">${r.supplierName}</td>
+                <td data-label="Total">৳${total.toFixed(2)}</td>
+                <td data-label="Paid">৳${paid.toFixed(2)}</td>
+                <td data-label="Status"><span class="${r.isPrinted ? 'printed-badge' : 'pending-badge'}">${r.isPrinted ? 'PRINTED' : 'PENDING'}</span></td>
+                <td data-label="Action"><div class="row-actions">
+                    <button class="btn btn-sm" onclick="printPO('${r.poId}', ${r.isPrinted})"><i class="fas fa-print"></i></button>
+                    <button class="btn btn-sm" style="background:#f39c12;" onclick="editPO('${r.poId}')"><i class="fas fa-edit"></i></button>
+                    <button class="btn btn-sm" style="background:#dc3545;" onclick="deletePO('${r.poId}')"><i class="fas fa-trash-alt"></i></button>
+                </div></td>
+            </tr>`);
+        });
+    }
+
+    function parseSheetDate(dateStr) {
+        if (!dateStr) return new Date(0);
+        if (dateStr instanceof Date) return dateStr;
+        
+        const parts = dateStr.split('-');
+        if (parts.length === 3) {
+            const months = { 
+                'jan':0, 'feb':1, 'mar':2, 'apr':3, 'may':4, 'jun':5, 
+                'jul':6, 'aug':7, 'sep':8, 'oct':9, 'nov':10, 'dec':11 
+            };
+            const day = parseInt(parts[0]);
+            const month = months[parts[1].toLowerCase()];
+            const year = parseInt(parts[2]);
+            if (!isNaN(day) && month !== undefined && !isNaN(year)) {
+                return new Date(year, month, day);
+            }
+        }
+        const fallback = new Date(dateStr);
+        return isNaN(fallback.getTime()) ? new Date(0) : fallback;
+    }
+
+    function openNewPOModal() { $('#modalTitle').text("Create New PO"); $('#isEditMode').val("false"); $('#newPOModal').show(); $('#poItemsBody').empty(); $('#supplierSelect').val(""); $('#poDateInput').val(new Date().toISOString().split('T')[0]); showProcessing(); google.script.run.withSuccessHandler(id => { $('#poIdInput').val(id); hideProcessing(); }).poGenerateID(); }
+    function editPO(poId) { showProcessing(); $('#modalTitle').text("Edit PO: " + poId); $('#isEditMode').val("true"); $('#poIdInput').val(poId); $('#poItemsBody').empty(); google.script.run.withSuccessHandler(data => { if(data.error) { alert(data.error); hideProcessing(); return; } if (data.header.date) $('#poDateInput').val(data.header.date.substring(0,10)); $('#supplierSelect').val(data.header.supplierId); data.items.forEach(item => { renderRow(item.sku, item.itemName, item.itemType, item.qty, item.unitCost); }); $('#newPOModal').show(); hideProcessing(); }).poGetPODetails(poId); }
+    
+    function addItemFromQuickSelect() { 
+        const supId = $('#supplierSelect').val();
+        if(!supId) return alert("Supplier selection is mandatory.");
+
+        const sku = $('#itemQuickSelect').val(); 
+        const name = $('#autoProductName').val();
+        const size = $('#autoSizeSelect').val();
+        const price = $('#autoPPrice').val();
+        const qty = $('#autoQty').val();
+        if(!sku || !name) return; 
+        renderRow(sku, name, size, qty, price); 
+        $('#itemQuickSelect, #autoProductName, #autoPPrice').val("");
+        $('#autoSizeSelect').val("");
+        $('#autoQty').val("1");
+    }
+    
+    function renderRow(sku, name, type, qty, cost) { const row = `<tr><td>${sku}</td><td>${name}</td><td>${type}</td><td><input type="number" class="form-control qty" value="${qty}" onchange="calcRow(this)"></td><td><input type="number" class="form-control unit-cost" value="${cost}" onchange="calcRow(this)"></td><td><input type="number" class="form-control total" value="${(qty*cost).toFixed(2)}" readonly></td><td><button class="btn" style="background:#dc3545;" onclick="$(this).closest('tr').remove()">X</button></td></tr>`; $('#poItemsBody').append(row); }
+    function calcRow(el) { const row = $(el).closest('tr'); const q = parseFloat(row.find('.qty').val()) || 0, c = parseFloat(row.find('.unit-cost').val()) || 0; row.find('.total').val((q*c).toFixed(2)); }
+    
+    function savePO() { 
+        const supId = $('#supplierSelect').val();
+        if(!supId) return alert("Supplier selection is mandatory.");
+
+        const supName = $('#supplierList option[value="' + supId + '"]').text() || supId;
+        const header = { poId: $('#poIdInput').val(), supplierId: supId, supplierName: supName, date: $('#poDateInput').val() }; 
+        const items = []; 
+        $('#poItemsBody tr').each(function() { 
+            const r = $(this); 
+            items.push({ 
+                sku: r.find('td:eq(0)').text(), 
+                itemName: r.find('td:eq(1)').text(), 
+                itemType: r.find('td:eq(2)').text(), 
+                qty: r.find('.qty').val(), 
+                unitCost: r.find('.unit-cost').val() 
+            }); 
+        }); 
+        if(items.length === 0) return alert("Add at least one item.");
+
+        showProcessing(); 
+        google.script.run.withSuccessHandler(res => { 
+            if(res.success) { $('#newPOModal').hide(); loadPOList(); } 
+            else alert(res.message); 
+            hideProcessing(); 
+        }).poSaveNewPO(header, items, $('#isEditMode').val() === "true"); 
+    }
+    
+    function printPO(poId, printed) { 
+        window.open(SCRIPT_URL + '?page=po_invoice&poId=' + poId, 'PO_Invoice', 'width=1000,height=800'); 
+        if(!printed) google.script.run.withSuccessHandler(loadPOList).markPOAsPrinted(poId); 
+    }
+    
+    function processBulk() { 
+        window.open(SCRIPT_URL + '?page=bulk_print&type=purchases', 'Bulk_Print_Purchases', 'width=1100,height=900'); 
+    }
+    
+    function deletePO(id) { 
+        if(confirm('Delete ' + id + '?')) { 
+            showProcessing(); 
+            google.script.run.withSuccessHandler(() => { loadPOList(); hideProcessing(); }).poDeletePO(id); 
+        } 
+    }
+
+    // Start
+    initPurchases();
+</script>
+</body>
+</html>

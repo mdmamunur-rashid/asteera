@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <base target="_top">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .container { padding: 20px; font-family: sans-serif; }
+        .header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .btn { padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; color: white; background-color: #008080; }
+        .data-table { width: 100%; border-collapse: collapse; background: white; }
+        .data-table th, .data-table td { padding: 12px; border-bottom: 1px solid #eee; text-align: left; }
+        .data-table th { background: #f8f9fa; font-weight: 600; }
+        
+        .modal { display: none; position: fixed; z-index: 1001; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); }
+        .modal-content { background: white; margin: 2% auto; padding: 20px; width: 450px; border-radius: 8px; }
+        .form-row { display: flex; gap: 10px; margin-bottom: 15px; }
+        .form-group { flex: 1; margin-bottom: 10px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: 600; }
+        .form-control { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        
+        .badge { padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: bold; text-transform: uppercase; }
+        .badge-ok { background: #e0f2f1; color: #008080; }
+        .badge-reorder { background: #fff3e0; color: #e67e22; }
+        
+        .processing-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.8); z-index: 2000; justify-content: center; align-items: center; }
+        .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #008080; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+
+<div class="container">
+    <div class="header-row">
+        <h2>Inventory Items</h2>
+        <div style="display:flex; gap:10px; align-items:center;">
+            <button class="btn" style="background:#64748b;" onclick="handleSync()" title="Recalculate Stock from History">
+                <i class="fas fa-sync-alt"></i> Sync
+            </button>
+            <div style="position:relative;">
+                <i class="fas fa-search" style="position:absolute; left:10px; top:12px; color:#999;"></i>
+                <input type="text" id="invSearchInput" placeholder="Search SKU, Name, Size..." class="form-control" style="padding-left:35px; width:250px;">
+            </div>
+            <button class="btn" onclick="openInvModal()">+ Add New Item</button>
+        </div>
+    </div>
+
+    <table class="data-table" id="invTable">
+        <thead>
+            <tr>
+                <th>Image</th>
+                <th>SKU</th>
+                <th>Size</th>
+                <th>Item Name</th>
+                <th>P.Price</th>
+                <th>S.Price</th>
+                <th>Purchased</th>
+                <th>Sold</th>
+                <th>Remaining</th>
+                <th>Status</th>
+                <th style="text-align:right">Action</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</div>
+
+<div id="invModal" class="modal">
+    <div class="modal-content">
+        <h3 id="invModalTitle">Add New Item</h3>
+        <input type="hidden" id="isInvEdit" value="false">
+        
+        <div class="form-group">
+            <label>SKU</label>
+            <input type="text" id="invSku" class="form-control">
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Item Size</label>
+                <input type="text" id="invSize" class="form-control">
+            </div>
+            <div class="form-group">
+                <label>Item Name</label>
+                <input type="text" id="invName" class="form-control">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Purchase Price</label>
+                <input type="number" id="invPPrice" class="form-control" step="0.01">
+            </div>
+            <div class="form-group">
+                <label>Sale Price</label>
+                <input type="number" id="invSPrice" class="form-control" step="0.01">
+            </div>
+        </div>
+        
+        <div style="text-align:right; margin-top:20px;">
+            <button class="btn" style="background:#6c757d" onclick="$('#invModal').hide()">Cancel</button>
+            <button class="btn" onclick="saveInv()">Save Item</button>
+        </div>
+    </div>
+</div>
+
+<div id="processingOverlay" class="processing-overlay"><div class="spinner"></div></div>
+
+<script>
+    let allItems = [];
+
+    $(document).ready(function() {
+        loadInventory();
+        $('#invSearchInput').on('input', function() {
+            filterAndRenderInv();
+        });
+    });
+
+    function showProcessing() { $('#processingOverlay').css('display', 'flex'); }
+    function hideProcessing() { $('#processingOverlay').hide(); }
+
+    function handleSync() {
+        showProcessing();
+        // The recalculation is handled by the backend function called during load
+        loadInventory();
+    }
+
+    function loadInventory() {
+        showProcessing();
+        google.script.run
+          .withSuccessHandler(data => {
+            allItems = data;
+            filterAndRenderInv();
+            hideProcessing();
+          })
+          .poGetInventoryItems();
+    }
+
+    function filterAndRenderInv() {
+        const query = $('#invSearchInput').val().toLowerCase();
+        const filtered = allItems.filter(i => {
+            if (!query) return true;
+            return i.id.toLowerCase().includes(query) || 
+                   i.name.toLowerCase().includes(query) || 
+                   (i.size && i.size.toLowerCase().includes(query));
+        });
+        renderInvTable(filtered);
+    }
+
+    function renderInvTable(data) {
+        const tbody = $('#invTable tbody').empty();
+        data.forEach(i => {
+            const remaining = parseFloat(i.remaining) || 0;
+            const isLow = remaining <= 5; 
+            const isNegative = remaining < 0;
+            
+            tbody.append(`<tr>
+                <td data-label="Image">
+                    ${i.image ? `<img src="${i.image}" style="width:40px; height:40px; border-radius:6px; object-fit:cover; border:1px solid #eee;">` : '<div style="width:40px; height:40px; background:#f8f9fa; border-radius:6px; border:1px dashed #ddd;"></div>'}
+                </td>
+                <td data-label="SKU"><strong>${i.id}</strong></td>
+                <td data-label="Size">${i.size || 'N/A'}</td>
+                <td data-label="Item Name">${i.name}</td>
+                <td data-label="P.Price">${i.pPrice.toFixed(2)}</td>
+                <td data-label="S.Price">${i.sPrice.toFixed(2)}</td>
+                <td data-label="Purchased">${i.purchased}</td>
+                <td data-label="Sold">${i.sold}</td>
+                <td data-label="Remaining" style="font-weight:bold; color:${isNegative ? '#e74c3c' : (isLow ? '#e67e22' : 'inherit')}">${remaining}</td>
+                <td data-label="Status">
+                    <span class="badge ${isNegative ? 'badge-reorder' : (isLow ? 'badge-reorder' : 'badge-ok')}">
+                        <i class="fas ${isNegative ? 'fa-exclamation-circle' : (isLow ? 'fa-exclamation-triangle' : 'fa-check-circle')}"></i>
+                        ${isNegative ? 'OVERSOLD' : (isLow ? 'REORDER' : 'OK')}
+                    </span>
+                </td>
+                <td data-label="Action" style="text-align:right">
+                    <button class="btn" style="background:#f39c12; padding:5px 10px;" onclick="editInv('${i.id}')">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                </td>
+            </tr>`);
+        });
+    }
+
+    function openInvModal() {
+        $('#invModalTitle').text("Add New Item");
+        $('#isInvEdit').val("false");
+        $('#invSku').prop('readonly', false).val("");
+        $('#invSize, #invName, #invPPrice, #invSPrice').val("");
+        $('#invModal').show();
+    }
+
+    function editInv(sku) {
+        const i = allItems.find(x => x.id === sku);
+        if(!i) return;
+        $('#invModalTitle').text("Edit Item");
+        $('#isInvEdit').val("true");
+        $('#invSku').val(i.id).prop('readonly', true);
+        $('#invSize').val(i.size);
+        $('#invName').val(i.name);
+        $('#invPPrice').val(i.pPrice);
+        $('#invSPrice').val(i.sPrice);
+        $('#invModal').show();
+    }
+
+    function saveInv() {
+        const item = {
+            sku: $('#invSku').val(),
+            size: $('#invSize').val(),
+            name: $('#invName').val(),
+            pPrice: parseFloat($('#invPPrice').val()) || 0,
+            sPrice: parseFloat($('#invSPrice').val()) || 0
+        };
+        const isEdit = $('#isInvEdit').val() === "true";
+        if(!item.sku || !item.name) return alert("Please enter SKU and Name");
+
+        showProcessing();
+        google.script.run.withSuccessHandler(res => {
+            hideProcessing();
+            if (res && res.success) {
+                $('#invModal').hide();
+                loadInventory();
+            } else {
+                alert(res ? res.message : "An unknown error occurred.");
+            }
+        }).invSaveItem(item, isEdit);
+    }
+</script>
+</body>
+</html>

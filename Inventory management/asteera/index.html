@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ASTEERA ERP - Professional Portal</title>
+    <style>
+        /* This CSS removes all margins and scrollbars from the parent window */
+        body, html { 
+            margin: 0; 
+            padding: 0; 
+            height: 100%; 
+            width: 100%;
+            overflow: hidden; 
+            background: #005a5a; /* Matches your brand color */
+        }
+        
+        /* The Magic: This iframe is slightly larger than the screen 
+           and shifted UP to hide the Google Banner */
+        iframe {
+            position: absolute;
+            top: -45px; /* Pushes the 45px Google banner off the top of the screen */
+            left: 0;
+            width: 100%;
+            height: calc(100% + 45px); /* Expands the height to cover the bottom gap */
+            border: none;
+        }
+    </style>
+</head>
+<body>
+    <!-- 
+      DIRECTIONS:
+      1. Deploy your Apps Script as a Web App.
+      2. Set "Execute as: Me" and "Who has access: Anyone".
+      3. Copy your Web App URL.
+      4. Paste it into the 'src' attribute below.
+    -->
+    <iframe src="PASTE_YOUR_APPS_SCRIPT_URL_HERE"></iframe>
+</body>
+</html>

@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <style>
+      body { font-family: sans-serif; margin: 10px; }
+      h2 { color: #4285F4; }
+      label { display: block; margin-top: 10px; font-weight: bold; }
+      input[type="text"], input[type="password"] {
+        width: calc(100% - 20px);
+        padding: 8px;
+        margin-top: 5px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+      }
+      button {
+        background-color: #4CAF50;
+        color: white;
+        padding: 10px 15px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        margin-top: 20px;
+        font-size: 16px;
+      }
+      button:hover {
+        background-color: #45a049;
+      }
+      #status {
+        margin-top: 15px;
+        padding: 10px;
+        border-radius: 4px;
+        display: none;
+      }
+      .success { background-color: #e0ffe0; color: #006400; border: 1px solid #006400; }
+      .error { background-color: #ffe0e0; color: #cc0000; border: 1px solid #cc0000; }
+      .warning { background-color: #fff3e0; color: #e65100; border: 1px solid #e65100; padding: 10px; }
+    </style>
+  </head>
+  <body>
+    <h2>Pathao API Settings</h2>
+    <form id="configForm">
+      <p>Enter your Pathao API credentials and Store ID below. A setup password is required to save changes. If you are the script owner, you will receive an additional confirmation popup.</p>
+      
+      <label for="clientId">Client ID:</label>
+      <input type="text" id="clientId" name="clientId" required>
+
+      <label for="clientSecret">Client Secret:</label>
+      <input type="password" id="clientSecret" name="clientSecret" required>
+
+      <label for="username">Pathao API Username (Email):</label>
+      <input type="text" id="username" name="username" required>
+
+      <label for="password">Pathao API Password:</label>
+      <input type="password" id="password" name="password" required>
+
+      <label for="baseUrl">Pathao API Base URL:</label>
+      <input type="text" id="baseUrl" name="baseUrl" required>
+      <small>e.g., https://api-hermes.pathao.com or https://courier-api-sandbox.pathao.com</small>
+      
+      <label for="pathaoStoreId">Pathao Store ID:</label>
+      <input type="text" id="pathaoStoreId" name="pathaoStoreId" required>
+
+      <hr>
+      <label for="adminPassword">Setup/Admin Password:</label>
+      <input type="password" id="adminPassword" name="adminPassword" placeholder="Required to save changes" required>
+
+      <button type="submit" id="saveButton">Save Configuration</button>
+    </form>
+
+    <hr>
+    <h3>Location Data</h3>
+    <p>Fetch latest cities and zones from Pathao. Requires saved API credentials.</p>
+    <button id="refreshLocationsButton">Refresh Location Data</button>
+
+    <div id="status"></div>
+
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        // Load existing configuration
+        google.script.run.withSuccessHandler(loadConfig).getStoredConfig();
+
+        document.getElementById('configForm').addEventListener('submit', function(e) {
+          e.preventDefault();
+          const saveButton = document.getElementById('saveButton');
+          saveButton.disabled = true;
+          saveButton.textContent = 'Saving...';
+          const statusDiv = document.getElementById('status');
+          statusDiv.style.display = 'none';
+
+          const config = {
+            clientId: document.getElementById('clientId').value,
+            clientSecret: document.getElementById('clientSecret').value,
+            username: document.getElementById('username').value,
+            password: document.getElementById('password').value,
+            baseUrl: document.getElementById('baseUrl').value,
+            pathaoStoreId: document.getElementById('pathaoStoreId').value,
+            adminPassword: document.getElementById('adminPassword').value
+          };
+
+          google.script.run
+            .withSuccessHandler(onSaveSuccess)
+            .withFailureHandler(onSaveFailure)
+            .saveConfig(config);
+        });
+
+        document.getElementById('refreshLocationsButton').addEventListener('click', function() {
+          const button = this;
+          button.disabled = true;
+          button.textContent = 'Refreshing...';
+          const statusDiv = document.getElementById('status');
+          statusDiv.style.display = 'none';
+
+          google.script.run
+            .withSuccessHandler(onRefreshLocationsSuccess)
+            .withFailureHandler(onRefreshLocationsFailure)
+            .fetchPathaoLocations(); // Call the server-side function
+        });
+      });
+
+      function loadConfig(config) {
+        if (config) {
+          document.getElementById('clientId').value = config.clientId || '';
+          document.getElementById('clientSecret').value = config.clientSecret || '';
+          document.getElementById('username').value = config.username || '';
+          document.getElementById('password').value = config.password || ''; 
+          document.getElementById('baseUrl').value = config.baseUrl || '';
+          document.getElementById('pathaoStoreId').value = config.pathaoStoreId || '';
+          // Admin password is never loaded for security
+        }
+      }
+
+      function onSaveSuccess() {
+        const saveButton = document.getElementById('saveButton');
+        saveButton.disabled = false;
+        saveButton.textContent = 'Save Configuration';
+        const statusDiv = document.getElementById('status');
+        statusDiv.className = 'success';
+        statusDiv.textContent = 'Configuration saved successfully! Token will be refreshed.';
+        statusDiv.style.display = 'block';
+      }
+
+      function onSaveFailure(error) {
+        const saveButton = document.getElementById('saveButton');
+        saveButton.disabled = false;
+        saveButton.textContent = 'Save Configuration';
+        const statusDiv = document.getElementById('status');
+        statusDiv.className = 'error';
+        statusDiv.textContent = 'Error saving configuration: ' + error.message;
+        statusDiv.style.display = 'block';
+      }
+
+      function onRefreshLocationsSuccess() {
+        const refreshButton = document.getElementById('refreshLocationsButton');
+        refreshButton.disabled = false;
+        refreshButton.textContent = 'Refresh Location Data';
+        const statusDiv = document.getElementById('status');
+        statusDiv.className = 'success';
+        statusDiv.textContent = 'Location data refreshed successfully!';
+        statusDiv.style.display = 'block';
+      }
+
+      function onRefreshLocationsFailure(error) {
+        const refreshButton = document.getElementById('refreshLocationsButton');
+        refreshButton.disabled = false;
+        refreshButton.textContent = 'Refresh Location Data';
+        const statusDiv = document.getElementById('status');
+        statusDiv.className = 'error';
+        statusDiv.textContent = 'Error refreshing location data: ' + error.message;
+        statusDiv.style.display = 'block';
+      }
+
+    </script>
+  </body>
+</html>

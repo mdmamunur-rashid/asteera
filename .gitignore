@@ -1,0 +1,9 @@
+hs_err_pid*.log
+node_modules/
+.next/
+.env
+.env.local
+*.tsbuildinfo
+
+# Vendor API docs saved with real account credentials / webhook secrets (kept locally only)
+order management/*.txt
