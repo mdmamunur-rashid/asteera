@@ -14,7 +14,7 @@ const url = process.env.DATABASE_URL;
 if (!url) throw new Error("DATABASE_URL is not set");
 
 const sqlText = fs.readFileSync(path.join(root, "drizzle", "0000_init_clean.sql"), "utf8");
-const statements = sqlText.split(/;\s*\r?\n/).map((s) => s.trim()).filter(Boolean);
+const statements = sqlText.split(/;\s*/).map((s) => s.trim()).filter(Boolean);
 
 const conn = await mysql.createConnection(url);
 try {
