@@ -26,7 +26,9 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       <nav className="side">
         <div className="side-brand">
           {brand.logoUrl && (
-            <img src={brand.logoUrl} alt={brand.name} style={{ width: "100%", maxHeight: 72, objectFit: "contain", display: "block" }} />
+            <div style={{ width: "100%", height: 96, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <img src={brand.logoUrl} alt={brand.name} style={{ width: "100%", height: "100%", objectFit: "contain", transform: "scale(1.35)" }} />
+            </div>
           )}
           <h1>{brand.name}</h1>
           <span className={`badge ${standalone ? "ok" : "warn"}`}>

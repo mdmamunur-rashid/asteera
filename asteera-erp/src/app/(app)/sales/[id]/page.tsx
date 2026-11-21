@@ -50,7 +50,9 @@ export default async function OrderDetail({
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 20, borderBottom: "2px solid var(--navy)", paddingBottom: 16, marginBottom: 18 }}>
           <div>
             {activeBrand.logoUrl && (
-              <img src={activeBrand.logoUrl} alt={activeBrand.name} style={{ maxHeight: 84, maxWidth: 240, objectFit: "contain", marginBottom: 8 }} />
+              <div style={{ width: 220, height: 92, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "flex-start", marginBottom: 6 }}>
+                <img src={activeBrand.logoUrl} alt={activeBrand.name} style={{ width: "100%", height: "100%", objectFit: "contain", transform: "scale(1.3)" }} />
+              </div>
             )}
             <h2 style={{ margin: "0 0 4px" }}>{activeBrand.name}</h2>
             {activeBrand.phone && <div style={{ fontSize: 13 }}>Phone: {activeBrand.phone}</div>}
