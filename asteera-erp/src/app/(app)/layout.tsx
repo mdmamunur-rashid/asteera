@@ -1,7 +1,9 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { eq } from "drizzle-orm";
+import { db, schema } from "@/db";
 import SidebarNav, { type NavItem } from "@/components/SidebarNav";
-import { canAccess, getSession } from "@/lib/auth";
+import { canAccess, getSession, resolvePermissions } from "@/lib/auth";
 import { getDefaultBrand, isStandaloneMode } from "@/lib/settings";
 import { logout } from "../login/actions";
 
@@ -23,15 +25,19 @@ const NAV: NavItem[] = [
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const [s, brand, standalone] = await Promise.all([getSession(), getDefaultBrand(), isStandaloneMode()]);
-  const allowed = NAV.filter((item) => item.mod === "sheet-edit" ? (canAccess(s, "inventory") || canAccess(s, "sales")) : canAccess(s, item.mod));
-  const initial = (s?.name?.[0] ?? "A").toUpperCase();
+  const [dbUser] = s ? await db.select().from(schema.users).where(eq(schema.users.id, s.uid)).limit(1) : [];
+  const liveSession = s && dbUser
+    ? { uid: dbUser.id, name: dbUser.name, role: dbUser.role, permissions: resolvePermissions(dbUser.role, dbUser.permissions) }
+    : s;
+  const allowed = NAV.filter((item) => item.mod === "sheet-edit" ? (canAccess(liveSession, "inventory") || canAccess(liveSession, "sales")) : canAccess(liveSession, item.mod));
+  const initial = (liveSession?.name?.[0] ?? "A").toUpperCase();
 
   return (
     <div className="shell">
       <nav className="side">
         <div className="side-brand">
           {brand.logoUrl && (
-            <div style={{ width: "100%", height: 90, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", background: "#fff", borderRadius: 10 }}>
+            <div style={{ width: "100%", height: 74, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", background: "#fff", borderRadius: 10 }}>
               <img src={brand.logoUrl} alt={brand.name} style={{ width: "100%", height: "100%", objectFit: "contain", transform: "scale(1.35)" }} />
             </div>
           )}
@@ -44,8 +50,8 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         <div className="side-profile">
           <div className="side-avatar">{initial}</div>
           <div style={{ minWidth: 0 }}>
-            <b style={{ display: "block", fontSize: 13.5, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s?.name}</b>
-            <small style={{ fontSize: 10.5, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "1px" }}>{s?.role}</small>
+            <b style={{ display: "block", fontSize: 13.5, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{liveSession?.name}</b>
+            <small style={{ fontSize: 10.5, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "1px" }}>{liveSession?.role}</small>
           </div>
         </div>
 
