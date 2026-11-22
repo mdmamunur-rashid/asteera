@@ -6,8 +6,8 @@ const root = process.cwd();
 const url = process.env.DATABASE_URL;
 if (!url) throw new Error("DATABASE_URL is not set");
 
-const sqlFiles = ["0000_init_clean.sql", "0001_phase2.sql", "0002_product_images.sql"];
-const conn = await mysql.createConnection(url);
+const sqlFiles = ["0000_init_clean.sql", "0001_phase2.sql", "0002_product_images.sql", "0003_utf8mb4.sql"];
+const conn = await mysql.createConnection({ uri: url, charset: "utf8mb4" });
 try {
   let count = 0;
   for (const file of sqlFiles) {

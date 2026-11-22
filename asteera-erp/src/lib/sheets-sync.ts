@@ -250,8 +250,20 @@ export async function syncFromGoogleSheets(): Promise<SyncResult> {
     }
 
     for (const [invoiceNo, g] of grouped) {
-      const [exists] = await db.select({ id: schema.orders.id }).from(schema.orders).where(eq(schema.orders.invoiceNo, invoiceNo)).limit(1);
-      if (exists) continue;
+      const [exists] = await db
+        .select({ id: schema.orders.id, customerName: schema.orders.customerName, address: schema.orders.address })
+        .from(schema.orders)
+        .where(eq(schema.orders.invoiceNo, invoiceNo))
+        .limit(1);
+      if (exists) {
+        if (exists.customerName.includes("?") || exists.address.includes("?")) {
+          await db.update(schema.orders).set({
+            customerName: g.name, phone: g.phone, address: g.address, note: g.note,
+          }).where(eq(schema.orders.id, exists.id));
+          counts.orders++;
+        }
+        continue;
+      }
       const [ins] = await db.insert(schema.orders).values({
         invoiceNo, date: g.date, customerName: g.name, phone: g.phone, address: g.address,
         status: "Billed", deliveryCharge: g.delivery, discount: g.discount, total: g.total, note: g.note,

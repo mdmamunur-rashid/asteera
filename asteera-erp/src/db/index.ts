@@ -12,6 +12,7 @@ const pool =
     uri: process.env.DATABASE_URL ?? "mysql://user:pass@localhost:3306/db",
     connectionLimit: 5,
     dateStrings: true,
+    charset: "utf8mb4",
   });
 if (process.env.NODE_ENV !== "production") g.__pool = pool;
 
