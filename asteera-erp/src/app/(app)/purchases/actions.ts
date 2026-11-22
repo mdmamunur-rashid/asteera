@@ -25,6 +25,28 @@ export async function createPurchase(f: FormData) {
   redirect(`/purchases/${id}`);
 }
 
+export async function updatePurchase(f: FormData) {
+  await requireSession();
+  const id = Number(f.get("id")), supplierId = Number(f.get("supplierId"));
+  const lines = parseLines(str(f, "lines"));
+  if (!id || !supplierId || lines.length === 0) redirect(`/purchases/${id}?error=Supplier+and+at+least+one+line+required`);
+
+  await db.transaction(async (tx) => {
+    await tx.update(schema.purchaseOrders).set({
+      date: str(f, "date") || today(),
+      supplierId,
+      paid: num(f, "paid"),
+      note: str(f, "note"),
+    }).where(eq(schema.purchaseOrders.id, id));
+    await tx.delete(schema.purchaseLines).where(eq(schema.purchaseLines.poId, id));
+    await tx.insert(schema.purchaseLines).values(lines.map((l) => ({ poId: id, itemId: l.itemId, qty: l.qty, unitCost: l.price })));
+  });
+
+  revalidatePath("/purchases");
+  revalidatePath(`/purchases/${id}`);
+  redirect(`/purchases/${id}?ok=Purchase+order+updated`);
+}
+
 export async function payPurchase(f: FormData) {
   await requireSession();
   const id = Number(f.get("id")), amount = num(f, "amount");

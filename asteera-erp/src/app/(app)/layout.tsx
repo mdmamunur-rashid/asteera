@@ -11,6 +11,7 @@ const NAV: NavItem[] = [
   { href: "/suppliers", label: "Suppliers", mod: "suppliers" },
   { href: "/purchases", label: "Purchases", mod: "purchases" },
   { href: "/sales", label: "Sales / Orders", mod: "sales" },
+  { href: "/sheet-edit", label: "Sheet Editor", mod: "sheet-edit" },
   { href: "/expenses", label: "Expenses", mod: "expenses" },
   { href: "/production", label: "Production", mod: "production" },
   { href: "/fabrics", label: "Fabric stock", mod: "fabrics" },
@@ -22,7 +23,7 @@ const NAV: NavItem[] = [
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const [s, brand, standalone] = await Promise.all([getSession(), getDefaultBrand(), isStandaloneMode()]);
-  const allowed = NAV.filter((item) => canAccess(s, item.mod));
+  const allowed = NAV.filter((item) => item.mod === "sheet-edit" ? (canAccess(s, "inventory") || canAccess(s, "sales")) : canAccess(s, item.mod));
   const initial = (s?.name?.[0] ?? "A").toUpperCase();
 
   return (

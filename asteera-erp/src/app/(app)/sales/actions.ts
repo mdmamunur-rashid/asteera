@@ -33,6 +33,43 @@ export async function createOrder(f: FormData) {
   redirect(`/sales/${id}`);
 }
 
+export async function updateOrder(f: FormData) {
+  await requireSession();
+  const id = Number(f.get("id"));
+  const customerName = str(f, "customerName");
+  const lines = parseLines(str(f, "lines"));
+  if (!id || !customerName || lines.length === 0) redirect(`/sales/${id}?error=Customer+name+and+at+least+one+line+required`);
+
+  const subtotal = lines.reduce((s, l) => s + l.qty * l.price, 0);
+  const delivery = num(f, "deliveryCharge"), discount = num(f, "discount"), returnCost = num(f, "returnCost");
+  const total = Math.max(0, subtotal + delivery - discount + returnCost);
+  const status = ORDER_STATUSES.includes(str(f, "status")) ? str(f, "status") : "Billed";
+
+  await db.transaction(async (tx) => {
+    await tx.update(schema.orders).set({
+      date: str(f, "date") || today(),
+      customerName,
+      phone: str(f, "phone"),
+      address: str(f, "address"),
+      pageName: str(f, "pageName"),
+      status,
+      paymentMode: str(f, "paymentMode") === "Paid" ? "Paid" : "COD",
+      deliveryCharge: delivery,
+      discount,
+      returnCost,
+      total,
+      paid: num(f, "paid"),
+      note: str(f, "note"),
+    }).where(eq(schema.orders.id, id));
+    await tx.delete(schema.orderLines).where(eq(schema.orderLines.orderId, id));
+    await tx.insert(schema.orderLines).values(lines.map((l) => ({ orderId: id, itemId: l.itemId, qty: l.qty, price: l.price })));
+  });
+
+  revalidatePath("/sales");
+  revalidatePath(`/sales/${id}`);
+  redirect(`/sales/${id}?ok=Order+updated`);
+}
+
 export async function setOrderStatus(f: FormData) {
   await requireSession();
   const id = Number(f.get("id")), status = str(f, "status");

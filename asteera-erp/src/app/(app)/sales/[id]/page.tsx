@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { and, desc, eq, ne, or } from "drizzle-orm";
+import { and, asc, desc, eq, ne, or } from "drizzle-orm";
 import { db, schema } from "@/db";
+import LineEditor from "@/components/LineEditor";
 import PrintButton from "@/components/PrintButton";
 import { getBrandByName, getBrandings, getSettingsMap, normalizeLogoUrl } from "@/lib/settings";
 import { fmt, ORDER_STATUSES } from "@/lib/util";
-import { markPrinted, payOrder, processReturn, sendToPathao, sendToSteadfast, setOrderStatus } from "../actions";
+import { markPrinted, payOrder, processReturn, sendToPathao, sendToSteadfast, setOrderStatus, updateOrder } from "../actions";
 
 export const dynamic = "force-dynamic";
 
@@ -21,9 +22,10 @@ export default async function OrderDetail({
   const [o] = await db.select().from(schema.orders).where(eq(schema.orders.id, id)).limit(1);
   if (!o) notFound();
 
-  const [lines, brands, activeBrand, cfg, returns, prevOrders] = await Promise.all([
-    db.select({ id: schema.orderLines.id, sku: schema.items.sku, name: schema.items.name, size: schema.items.size, imageUrl: schema.items.imageUrl, qty: schema.orderLines.qty, price: schema.orderLines.price })
+  const [lines, allItems, brands, activeBrand, cfg, returns, prevOrders] = await Promise.all([
+    db.select({ id: schema.orderLines.id, itemId: schema.orderLines.itemId, sku: schema.items.sku, name: schema.items.name, size: schema.items.size, imageUrl: schema.items.imageUrl, qty: schema.orderLines.qty, price: schema.orderLines.price })
       .from(schema.orderLines).innerJoin(schema.items, eq(schema.items.id, schema.orderLines.itemId)).where(eq(schema.orderLines.orderId, id)),
+    db.select().from(schema.items).orderBy(asc(schema.items.sku)),
     getBrandings(),
     getBrandByName(forceBrand || o.pageName),
     getSettingsMap(),
@@ -162,6 +164,33 @@ export default async function OrderDetail({
           <button className="btn">Add payment</button>
         </form>
       </div>
+
+      <details className="noprint card" style={{ maxWidth: 860, margin: "16px auto" }}>
+        <summary><b>Edit Order Details &amp; Line Items</b></summary>
+        <form action={updateOrder} style={{ marginTop: 12 }}>
+          <input type="hidden" name="id" value={id} />
+          <div className="form" style={{ marginBottom: 12 }}>
+            <label>Date<input type="date" name="date" defaultValue={o.date} /></label>
+            <label>Customer Name<input name="customerName" defaultValue={o.customerName} required /></label>
+            <label>Phone<input name="phone" defaultValue={o.phone} /></label>
+            <label>Address<input name="address" defaultValue={o.address} /></label>
+            <label>Page / Brand<input name="pageName" defaultValue={o.pageName} /></label>
+            <label>Status<select name="status" defaultValue={o.status}>{ORDER_STATUSES.map((s) => <option key={s}>{s}</option>)}</select></label>
+            <label>Payment<select name="paymentMode" defaultValue={o.paymentMode}><option>COD</option><option>Paid</option></select></label>
+            <label>Delivery Charge<input type="number" step="any" name="deliveryCharge" defaultValue={o.deliveryCharge} /></label>
+            <label>Discount<input type="number" step="any" name="discount" defaultValue={o.discount} /></label>
+            <label>Return Cost<input type="number" step="any" name="returnCost" defaultValue={o.returnCost} /></label>
+            <label>Paid<input type="number" step="any" name="paid" defaultValue={o.paid} /></label>
+            <label>Note<input name="note" defaultValue={o.note} /></label>
+          </div>
+          <LineEditor
+            priceLabel="Price (MRP)"
+            options={allItems.map((i) => ({ id: i.id, label: `${i.sku} — ${i.name} ${i.size}`, price: i.salePrice }))}
+            initialRows={lines.map((l) => ({ itemId: l.itemId, qty: l.qty, price: l.price }))}
+          />
+          <button className="btn">Save Order Changes</button>
+        </form>
+      </details>
 
       <details className="noprint card" style={{ maxWidth: 860, margin: "16px auto" }}>
         <summary><b>Process Return (Full or Partial)</b></summary>

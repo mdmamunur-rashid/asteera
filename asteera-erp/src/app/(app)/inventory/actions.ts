@@ -28,6 +28,30 @@ export async function createItem(f: FormData) {
   redirect("/inventory");
 }
 
+export async function updateItem(f: FormData) {
+  await requireSession();
+  const id = Number(f.get("id"));
+  const sku = str(f, "sku"), name = str(f, "name");
+  if (!id || !sku || !name) redirect(`/inventory/${id}?error=SKU+and+name+required`);
+  try {
+    await db.update(schema.items).set({
+      sku,
+      name,
+      size: str(f, "size"),
+      type: str(f, "type"),
+      category: str(f, "category"),
+      purchasePrice: num(f, "purchasePrice"),
+      salePrice: num(f, "salePrice"),
+      reorderLevel: Math.round(num(f, "reorderLevel")) || 5,
+      imageUrl: normalizeLogoUrl(str(f, "imageUrl")),
+    }).where(eq(schema.items.id, id));
+  } catch {
+    redirect(`/inventory/${id}?error=SKU+already+exists`);
+  }
+  revalidatePath("/inventory");
+  redirect(`/inventory/${id}?ok=Item+updated`);
+}
+
 export async function updateItemImage(f: FormData) {
   await requireSession();
   const id = Number(f.get("id"));

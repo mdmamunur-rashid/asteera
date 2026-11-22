@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { like, or, asc } from "drizzle-orm";
 import { db, schema } from "@/db";
 import ProductImageInput from "@/components/ProductImageInput";
@@ -58,10 +59,13 @@ export default async function Inventory({ searchParams }: { searchParams: Promis
                       <button className="btn secondary" style={{ padding: "4px 8px", fontSize: 11.5 }}>Save</button>
                     </form>
                   </td>
-                  <td>{i.sku}</td><td>{i.name}</td><td>{i.size}</td><td>{fmt(i.purchasePrice)}</td><td>{fmt(i.salePrice)}</td>
+                  <td><Link href={`/inventory/${i.id}`}><b>{i.sku}</b></Link></td><td>{i.name}</td><td>{i.size}</td><td>{fmt(i.purchasePrice)}</td><td>{fmt(i.salePrice)}</td>
                   <td>{fmt(s.purchased)}</td><td>{fmt(s.sold)}</td><td><b>{fmt(s.remaining)}</b></td>
                   <td><span className={`badge ${reorder ? "bad" : "ok"}`}>{reorder ? "Yes" : "No"}</span></td>
-                  <td><form action={deleteItem}><input type="hidden" name="id" value={i.id} /><button className="link">Delete</button></form></td>
+                  <td style={{ whiteSpace: "nowrap" }}>
+                    <Link href={`/inventory/${i.id}`} className="btn secondary" style={{ padding: "4px 8px", fontSize: 11.5, marginRight: 6 }}>Edit</Link>
+                    <form action={deleteItem} style={{ display: "inline" }}><input type="hidden" name="id" value={i.id} /><button className="link">Delete</button></form>
+                  </td>
                 </tr>
               );
             })}
