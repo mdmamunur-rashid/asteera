@@ -39,8 +39,8 @@ export default async function OrderDetail({
   const prevOrders = p10.length === 10
     ? candidateOrders.filter((c) => last10(c.phone) === p10).slice(0, 15)
     : candidateOrders;
-  const sameDayDups = p10.length === 10 && o.status !== "Cancelled"
-    ? prevOrders.filter((p) => p.date === o.date && p.status !== "Cancelled")
+  const sameDayDups = p10.length === 10 && o.status !== "Cancelled" && o.dupAccepted === 0
+    ? prevOrders.filter((p) => p.date === o.date && p.status !== "Cancelled" && p.dupAccepted === 0)
     : [];
 
   const subtotal = lines.reduce((s, l) => s + l.qty * l.price, 0);

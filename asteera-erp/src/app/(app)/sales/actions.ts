@@ -165,6 +165,30 @@ export async function bulkOrderAction(f: FormData) {
   redirect("/sales");
 }
 
+export async function acceptDuplicate(f: FormData) {
+  await requireSession();
+  const ids = f.getAll("ids").map(Number).filter((n) => n > 0);
+  if (ids.length > 0) {
+    await db.update(schema.orders).set({ dupAccepted: 1 }).where(inArray(schema.orders.id, ids));
+  }
+  revalidatePath("/sales");
+  redirect("/sales?ok=Duplication+accepted+(warning+muted)");
+}
+
+export async function deleteOrder(f: FormData) {
+  await requireSession();
+  const id = Number(f.get("id"));
+  if (id > 0) {
+    await db.transaction(async (tx) => {
+      await tx.delete(schema.orderLines).where(eq(schema.orderLines.orderId, id));
+      await tx.delete(schema.orderReturns).where(eq(schema.orderReturns.orderId, id));
+      await tx.delete(schema.orders).where(eq(schema.orders.id, id));
+    });
+  }
+  revalidatePath("/sales");
+  redirect("/sales?ok=Order+deleted");
+}
+
 export async function processReturn(f: FormData) {
   await requireSession();
   const id = Number(f.get("id"));

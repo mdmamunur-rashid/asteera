@@ -112,6 +112,7 @@ export const orders = mysqlTable("orders", {
   courier: varchar("courier", { length: 30 }).notNull().default(""),
   trackingNo: varchar("tracking_no", { length: 80 }).notNull().default(""),
   note: varchar("note", { length: 400 }).notNull().default(""),
+  dupAccepted: int("dup_accepted").notNull().default(0),
   printedAt: timestamp("printed_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => [uniqueIndex("orders_invoice_uq").on(t.invoiceNo), index("orders_status_idx").on(t.status)]);
