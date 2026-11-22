@@ -23,3 +23,8 @@ export const ORDER_STATUSES = ["New", "Ready to Bill", "Billed", "In Courier", "
 /** Statuses that do NOT reduce stock. */
 export const NON_STOCK_STATUSES = ["New", "Cancelled", "Returned"];
 export const STAGE_STATUSES = ["Not Started", "In Progress", "Done", "On Hold"];
+
+export const last10 = (phone: string | null | undefined): string => {
+  const digits = String(phone ?? "").replace(/\D/g, "");
+  return digits.length >= 10 ? digits.slice(-10) : digits;
+};

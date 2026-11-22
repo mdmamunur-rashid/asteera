@@ -1,12 +1,12 @@
 "use server";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, like, ne, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { requireSession } from "@/lib/auth";
 import { dispatchPathao, dispatchSteadfast } from "@/lib/integrations";
 import { nextInvoiceNo } from "@/lib/queries";
-import { num, ORDER_STATUSES, parseLines, str, today } from "@/lib/util";
+import { last10, num, ORDER_STATUSES, parseLines, str, today } from "@/lib/util";
 
 export async function createOrder(f: FormData) {
   await requireSession();
@@ -19,18 +19,32 @@ export async function createOrder(f: FormData) {
   const total = Math.max(0, subtotal + delivery - discount);
   const status = ORDER_STATUSES.includes(str(f, "status")) ? str(f, "status") : "Billed";
 
+  const orderDate = str(f, "date") || today();
+  const phone = str(f, "phone");
   const id = await db.transaction(async (tx) => {
     const [r] = await tx.insert(schema.orders).values({
-      invoiceNo: await nextInvoiceNo(), date: str(f, "date") || today(), customerName,
-      phone: str(f, "phone"), address: str(f, "address"), pageName: str(f, "pageName"), status,
+      invoiceNo: await nextInvoiceNo(), date: orderDate, customerName,
+      phone, address: str(f, "address"), pageName: str(f, "pageName"), status,
       paymentMode: str(f, "paymentMode") === "Paid" ? "Paid" : "COD",
       deliveryCharge: delivery, discount, total, paid: num(f, "paid"), note: str(f, "note"),
     }).$returningId();
     await tx.insert(schema.orderLines).values(lines.map((l) => ({ orderId: r.id, itemId: l.itemId, qty: l.qty, price: l.price })));
     return r.id;
   });
+
+  const p10 = last10(phone);
+  let dupWarn = "";
+  if (p10.length === 10) {
+    const sameDay = await db.select({ id: schema.orders.id, invoiceNo: schema.orders.invoiceNo, phone: schema.orders.phone })
+      .from(schema.orders)
+      .where(and(eq(schema.orders.date, orderDate), ne(schema.orders.id, id), like(schema.orders.phone, `%${p10.slice(-6)}`)));
+    const dups = sameDay.filter((o) => last10(o.phone) === p10);
+    if (dups.length > 0) {
+      dupWarn = `?warn=${encodeURIComponent(`Duplicate phone (${p10}) found on ${orderDate}: ${dups.map((d) => d.invoiceNo).join(", ")}`)}`;
+    }
+  }
   revalidatePath("/sales");
-  redirect(`/sales/${id}`);
+  redirect(`/sales/${id}${dupWarn}`);
 }
 
 export async function updateOrder(f: FormData) {

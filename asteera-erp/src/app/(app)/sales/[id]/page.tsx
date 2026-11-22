@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { and, asc, desc, eq, ne, or } from "drizzle-orm";
+import { and, asc, desc, eq, like, ne } from "drizzle-orm";
 import { db, schema } from "@/db";
 import LineEditor from "@/components/LineEditor";
 import PrintButton from "@/components/PrintButton";
 import { getBrandByName, getBrandings, getSettingsMap, normalizeLogoUrl } from "@/lib/settings";
-import { fmt, ORDER_STATUSES } from "@/lib/util";
+import { fmt, last10, ORDER_STATUSES } from "@/lib/util";
 import { markPrinted, payOrder, processReturn, sendToPathao, sendToSteadfast, setOrderStatus, updateOrder } from "../actions";
 
 export const dynamic = "force-dynamic";
@@ -15,14 +15,15 @@ export default async function OrderDetail({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ forceBrand?: string; ok?: string; error?: string }>;
+  searchParams: Promise<{ forceBrand?: string; ok?: string; error?: string; warn?: string }>;
 }) {
-  const [{ id: rawId }, { forceBrand, ok, error }] = await Promise.all([params, searchParams]);
+  const [{ id: rawId }, { forceBrand, ok, error, warn }] = await Promise.all([params, searchParams]);
   const id = Number(rawId);
   const [o] = await db.select().from(schema.orders).where(eq(schema.orders.id, id)).limit(1);
   if (!o) notFound();
 
-  const [lines, allItems, brands, activeBrand, cfg, returns, prevOrders] = await Promise.all([
+  const p10 = last10(o.phone);
+  const [lines, allItems, brands, activeBrand, cfg, returns, candidateOrders] = await Promise.all([
     db.select({ id: schema.orderLines.id, itemId: schema.orderLines.itemId, sku: schema.items.sku, name: schema.items.name, size: schema.items.size, imageUrl: schema.items.imageUrl, qty: schema.orderLines.qty, price: schema.orderLines.price })
       .from(schema.orderLines).innerJoin(schema.items, eq(schema.items.id, schema.orderLines.itemId)).where(eq(schema.orderLines.orderId, id)),
     db.select().from(schema.items).orderBy(asc(schema.items.sku)),
@@ -30,13 +31,17 @@ export default async function OrderDetail({
     getBrandByName(forceBrand || o.pageName),
     getSettingsMap(),
     db.select().from(schema.orderReturns).where(eq(schema.orderReturns.orderId, id)).orderBy(desc(schema.orderReturns.id)),
-    db.select().from(schema.orders)
-      .where(and(
-        ne(schema.orders.id, id),
-        o.phone ? or(eq(schema.orders.phone, o.phone), eq(schema.orders.customerName, o.customerName)) : eq(schema.orders.customerName, o.customerName),
-      ))
-      .orderBy(desc(schema.orders.id)).limit(10),
+    p10.length >= 6
+      ? db.select().from(schema.orders).where(and(ne(schema.orders.id, id), like(schema.orders.phone, `%${p10.slice(-6)}`))).orderBy(desc(schema.orders.id)).limit(50)
+      : db.select().from(schema.orders).where(and(ne(schema.orders.id, id), eq(schema.orders.customerName, o.customerName))).orderBy(desc(schema.orders.id)).limit(20),
   ]);
+
+  const prevOrders = p10.length === 10
+    ? candidateOrders.filter((c) => last10(c.phone) === p10).slice(0, 15)
+    : candidateOrders;
+  const sameDayDups = p10.length === 10 && o.status !== "Cancelled"
+    ? prevOrders.filter((p) => p.date === o.date && p.status !== "Cancelled")
+    : [];
 
   const subtotal = lines.reduce((s, l) => s + l.qty * l.price, 0);
   const sigUrl = cfg.authorized_signature_url || "";
@@ -46,6 +51,17 @@ export default async function OrderDetail({
     <>
       <PrintButton floating />
       {error && <div className="err noprint">{error}</div>}
+      {warn && <div className="err noprint">{warn}</div>}
+      {sameDayDups.length > 0 && (
+        <div className="err noprint">
+          <b>Same-day duplicate phone warning ({p10}):</b>{" "}
+          {sameDayDups.map((d) => (
+            <Link key={d.id} href={`/sales/${d.id}`} style={{ marginRight: 8, textDecoration: "underline", color: "#991b1b" }}>
+              {d.invoiceNo} ({d.status})
+            </Link>
+          ))}
+        </div>
+      )}
       {ok && <div className="card noprint" style={{ background: "#d1fae5", color: "#065f46" }}>{ok}</div>}
 
       <div className="invoice">

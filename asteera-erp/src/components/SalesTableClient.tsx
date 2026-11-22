@@ -17,6 +17,7 @@ export type SaleRow = {
   courier: string;
   trackingNo: string;
   orderCountLabel: string;
+  sameDayDup: boolean;
 };
 
 export default function SalesTableClient({
@@ -70,12 +71,13 @@ export default function SalesTableClient({
             {rows.map((o) => {
               const due = Math.max(0, o.total - o.paid);
               return (
-                <tr key={o.id}>
+                <tr key={o.id} style={{ background: o.sameDayDup ? "#fef2f2" : undefined }}>
                   <td><input type="checkbox" checked={selected.includes(o.id)} onChange={() => toggleOne(o.id)} /></td>
                   <td>
                     <Link href={`/sales/${o.id}`}><b>{o.invoiceNo}</b></Link><br />
                     <small style={{ color: "var(--muted)" }}>{o.date}</small>{" "}
                     <span className="badge info">{o.orderCountLabel}</span>
+                    {o.sameDayDup && <>{" "}<span className="badge bad">Same-day duplicate</span></>}
                   </td>
                   <td>
                     <b>{o.customerName}</b><br />
