@@ -93,11 +93,15 @@ export async function syncFromGoogleSheets(): Promise<SyncResult> {
       const r = iRows[i];
       const sku = r[0];
       if (!sku) continue;
+      const img = normalizeLogoUrl(r[9]);
       await db.insert(schema.items).values({
         sku, size: r[1] || "", name: r[2] || sku,
-        purchasePrice: numVal(r[3]), salePrice: numVal(r[4]), imageUrl: r[9] || "",
+        purchasePrice: numVal(r[3]), salePrice: numVal(r[4]), imageUrl: img,
       }).onDuplicateKeyUpdate({
-        set: { size: r[1] || "", name: r[2] || sku, purchasePrice: numVal(r[3]), salePrice: numVal(r[4]), imageUrl: r[9] || "" },
+        set: {
+          size: r[1] || "", name: r[2] || sku, purchasePrice: numVal(r[3]), salePrice: numVal(r[4]),
+          ...(img ? { imageUrl: img } : {}),
+        },
       });
       counts.items++;
     }

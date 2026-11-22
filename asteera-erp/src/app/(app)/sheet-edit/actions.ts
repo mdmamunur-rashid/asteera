@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { requireSession } from "@/lib/auth";
+import { normalizeLogoUrl } from "@/lib/settings";
 import { ORDER_STATUSES, str } from "@/lib/util";
 
 export async function saveSheetChanges(f: FormData) {
@@ -33,6 +34,7 @@ export async function saveSheetChanges(f: FormData) {
           purchasePrice: Number(r.purchasePrice) || 0,
           salePrice: Number(r.salePrice) || 0,
           reorderLevel: Math.round(Number(r.reorderLevel)) || 5,
+          ...(r.imageUrl !== undefined ? { imageUrl: normalizeLogoUrl(String(r.imageUrl)) } : {}),
         }).where(eq(schema.items.id, id));
       }
     });

@@ -35,17 +35,22 @@ export default function ProductImageInput({
     reader.readAsDataURL(file);
   }
 
+  const size = compact ? 36 : 48;
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
       <input type="hidden" name="imageUrl" value={val} />
-      {val && (
+      {val ? (
         <img
           src={val}
           alt="Product"
-          style={{ width: compact ? 32 : 44, height: compact ? 32 : 44, objectFit: "cover", borderRadius: 6, border: "1px solid var(--line)" }}
+          style={{ width: size, height: size, objectFit: "cover", borderRadius: 6, border: "1px solid var(--line)", flexShrink: 0 }}
         />
+      ) : (
+        <div style={{ width: size, height: size, borderRadius: 6, border: "1px dashed #cbd5e1", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: "#94a3b8", flexShrink: 0 }}>
+          No img
+        </div>
       )}
-      <input type="file" accept="image/*" onChange={onFile} style={{ maxWidth: compact ? 175 : 220, padding: 4, fontSize: 12 }} />
+      <input type="file" accept="image/*" onChange={onFile} style={{ maxWidth: compact ? 165 : 220, padding: 4, fontSize: 12 }} />
       {!compact && (
         <input
           type="text"

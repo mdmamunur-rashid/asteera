@@ -32,10 +32,11 @@ export default async function SheetEditPage({
       { key: "purchasePrice", label: "P.Price", type: "number", width: 90 },
       { key: "salePrice", label: "S.Price", type: "number", width: 90 },
       { key: "reorderLevel", label: "Reorder", type: "number", width: 75 },
+      { key: "imageUrl", label: "Image URL", width: 200 },
     ];
     initialRows = items.map((i) => ({
       id: i.id, sku: i.sku, name: i.name, size: i.size, type: i.type, category: i.category,
-      purchasePrice: i.purchasePrice, salePrice: i.salePrice, reorderLevel: i.reorderLevel,
+      purchasePrice: i.purchasePrice, salePrice: i.salePrice, reorderLevel: i.reorderLevel, imageUrl: i.imageUrl ?? "",
     }));
   } else if (tab === "orders") {
     const orders = await db.select().from(schema.orders)
