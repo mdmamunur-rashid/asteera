@@ -20,9 +20,9 @@ function ordinal(n: number): string {
 export default async function Sales({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; status?: string; date?: string; ok?: string; error?: string }>;
+  searchParams: Promise<{ q?: string; status?: string; date?: string; brand?: string; courier?: string; ok?: string; error?: string }>;
 }) {
-  const { q, status, date: dateParam, ok, error } = await searchParams;
+  const { q, status, date: dateParam, brand, courier, ok, error } = await searchParams;
   const selectedDate = dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam) ? dateParam : "";
   const checkDate = selectedDate || bdToday();
   const term = q ? `%${q}%` : null;
@@ -32,6 +32,8 @@ export default async function Sales({
       .where(and(
         status ? eq(schema.orders.status, status) : undefined,
         selectedDate ? eq(schema.orders.date, selectedDate) : undefined,
+        brand ? eq(schema.orders.pageName, brand) : undefined,
+        courier ? eq(schema.orders.courier, courier) : undefined,
         term ? or(like(schema.orders.invoiceNo, term), like(schema.orders.customerName, term), like(schema.orders.phone, term)) : undefined,
       ))
       .orderBy(desc(schema.orders.id)).limit(300),
@@ -127,7 +129,7 @@ export default async function Sales({
 
   return (
     <>
-      <h2>Sales / Orders</h2>
+      <h2>Sales / Orders{brand ? ` — ${brand}` : ""}{courier ? ` — ${courier}` : ""}</h2>
       {error && <div className="err">{error}</div>}
       {ok && <div className="card" style={{ background: "#d1fae5", color: "#065f46" }}>{ok}</div>}
       {unacceptedDupGroups.length > 0 && (

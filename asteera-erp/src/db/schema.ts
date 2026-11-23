@@ -186,3 +186,14 @@ export const ledgerEntries = mysqlTable("ledger_entries", {
   totalDue: money("total_due"),
   amountPaid: money("amount_paid"),
 }, (t) => [uniqueIndex("ledger_ref_uq").on(t.ref), index("ledger_supplier_idx").on(t.supplierId)]);
+
+export const campaigns = mysqlTable("campaigns", {
+  id: int("id").autoincrement().primaryKey(),
+  date: date("date", { mode: "string" }).notNull(),
+  name: varchar("name", { length: 160 }).notNull(),
+  brand: varchar("brand", { length: 80 }).notNull().default(""),
+  spend: money("spend"),
+  ordersCount: int("orders_count").notNull().default(0),
+  revenue: money("revenue"),
+  notes: varchar("notes", { length: 300 }).notNull().default(""),
+}, (t) => [index("camp_date_idx").on(t.date)]);
