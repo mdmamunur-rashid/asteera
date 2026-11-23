@@ -27,6 +27,32 @@ try {
     }
   }
   console.log(`Database initialized (${count} statements checked).`);
+
+  const prodPath = path.join(root, "scripts", "sheet-products.json");
+  if (fs.existsSync(prodPath)) {
+    const products = JSON.parse(fs.readFileSync(prodPath, "utf8"));
+    let upserted = 0;
+    for (const p of products) {
+      if (!p.sku) continue;
+      await conn.execute(
+        `INSERT INTO items (sku, name, size, type, category, sale_price, image_url)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE
+           name = COALESCE(NULLIF(?, ''), name),
+           size = COALESCE(NULLIF(?, ''), size),
+           type = COALESCE(NULLIF(?, ''), type),
+           category = COALESCE(NULLIF(?, ''), category),
+           sale_price = IF(? > 0, ?, sale_price),
+           image_url = COALESCE(NULLIF(?, ''), image_url)`,
+        [
+          p.sku, p.name || p.sku, p.size || "", p.page || "", p.page || "", Number(p.price) || 0, p.imageUrl || "",
+          p.name || "", p.size || "", p.page || "", p.page || "", Number(p.price) || 0, Number(p.price) || 0, p.imageUrl || "",
+        ]
+      );
+      upserted++;
+    }
+    console.log(`Upserted ${upserted} products from sheet-products.json.`);
+  }
 } finally {
   await conn.end();
 }
