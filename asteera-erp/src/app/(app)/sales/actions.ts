@@ -87,6 +87,7 @@ export async function updateOrder(f: FormData) {
 export async function setOrderStatus(f: FormData) {
   await requireSession();
   const id = Number(f.get("id")), status = str(f, "status");
+  const returnTo = str(f, "returnTo");
   if (ORDER_STATUSES.includes(status)) {
     await db.update(schema.orders).set({
       status,
@@ -94,8 +95,10 @@ export async function setOrderStatus(f: FormData) {
       trackingNo: str(f, "trackingNo") || undefined,
     }).where(eq(schema.orders.id, id));
   }
+  revalidatePath("/sales");
+  revalidatePath("/wholesale");
   revalidatePath(`/sales/${id}`);
-  redirect(`/sales/${id}`);
+  redirect(returnTo.startsWith("/") ? returnTo : `/sales/${id}`);
 }
 
 export async function payOrder(f: FormData) {
@@ -109,7 +112,11 @@ export async function payOrder(f: FormData) {
 export async function markPrinted(f: FormData) {
   await requireSession();
   const id = Number(f.get("id"));
+  const toBulkPrint = str(f, "toBulkPrint") === "1";
   await db.update(schema.orders).set({ printedAt: sql`NOW()` }).where(eq(schema.orders.id, id));
+  revalidatePath("/sales");
+  revalidatePath("/wholesale");
+  if (toBulkPrint) redirect(`/sales/bulk-print?ids=${id}`);
   redirect(`/sales/${id}`);
 }
 
@@ -140,7 +147,9 @@ export async function bulkOrderAction(f: FormData) {
   await requireSession();
   const ids = f.getAll("ids").map(Number).filter((n) => n > 0);
   const action = str(f, "bulkAction");
-  if (ids.length === 0 || !action) redirect("/sales?error=Select+orders+and+an+action");
+  const rawReturn = str(f, "returnTo");
+  const backTo = rawReturn.startsWith("/") ? rawReturn : "/sales";
+  if (ids.length === 0 || !action) redirect(`${backTo}?error=Select+orders+and+an+action`);
 
   if (action === "print") {
     redirect(`/sales/bulk-print?ids=${ids.join(",")}`);
@@ -149,35 +158,44 @@ export async function bulkOrderAction(f: FormData) {
     let okCount = 0;
     for (const id of ids) { if ((await dispatchSteadfast(id)).ok) okCount++; }
     revalidatePath("/sales");
-    redirect(`/sales?ok=${encodeURIComponent(`Sent ${okCount}/${ids.length} to Steadfast`)}`);
+    revalidatePath("/wholesale");
+    redirect(`${backTo}?ok=${encodeURIComponent(`Sent ${okCount}/${ids.length} to Steadfast`)}`);
   }
   if (action === "pathao") {
     let okCount = 0;
     for (const id of ids) { if ((await dispatchPathao(id)).ok) okCount++; }
     revalidatePath("/sales");
-    redirect(`/sales?ok=${encodeURIComponent(`Sent ${okCount}/${ids.length} to Pathao`)}`);
+    revalidatePath("/wholesale");
+    redirect(`${backTo}?ok=${encodeURIComponent(`Sent ${okCount}/${ids.length} to Pathao`)}`);
   }
   if (ORDER_STATUSES.includes(action)) {
     await db.update(schema.orders).set({ status: action }).where(inArray(schema.orders.id, ids));
     revalidatePath("/sales");
-    redirect(`/sales?ok=${encodeURIComponent(`Updated ${ids.length} order(s) to ${action}`)}`);
+    revalidatePath("/wholesale");
+    redirect(`${backTo}?ok=${encodeURIComponent(`Updated ${ids.length} order(s) to ${action}`)}`);
   }
-  redirect("/sales");
+  redirect(backTo);
 }
 
 export async function acceptDuplicate(f: FormData) {
   await requireSession();
   const ids = f.getAll("ids").map(Number).filter((n) => n > 0);
+  const rawReturn = str(f, "returnTo");
+  const backTo = rawReturn.startsWith("/") ? rawReturn : "/sales";
   if (ids.length > 0) {
     await db.update(schema.orders).set({ dupAccepted: 1 }).where(inArray(schema.orders.id, ids));
   }
   revalidatePath("/sales");
-  redirect("/sales?ok=Duplication+accepted+(warning+muted)");
+  revalidatePath("/wholesale");
+  revalidatePath("/sheet-edit");
+  redirect(`${backTo}${backTo.includes("?") ? "&" : "?"}ok=Duplication+accepted+(warning+muted)`);
 }
 
 export async function deleteOrder(f: FormData) {
   await requireSession();
   const id = Number(f.get("id"));
+  const rawReturn = str(f, "returnTo");
+  const backTo = rawReturn.startsWith("/") ? rawReturn : "/sales";
   if (id > 0) {
     await db.transaction(async (tx) => {
       await tx.delete(schema.orderLines).where(eq(schema.orderLines.orderId, id));
@@ -186,7 +204,9 @@ export async function deleteOrder(f: FormData) {
     });
   }
   revalidatePath("/sales");
-  redirect("/sales?ok=Order+deleted");
+  revalidatePath("/wholesale");
+  revalidatePath("/sheet-edit");
+  redirect(`${backTo}${backTo.includes("?") ? "&" : "?"}ok=Order+deleted`);
 }
 
 export async function processReturn(f: FormData) {

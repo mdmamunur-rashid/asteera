@@ -1,0 +1,10 @@
+ALTER TABLE `orders` ADD COLUMN `query_no` varchar(40) NOT NULL DEFAULT '';
+ALTER TABLE `orders` ADD COLUMN `website_order_no` varchar(60) NOT NULL DEFAULT '';
+ALTER TABLE `orders` ADD COLUMN `initiate_by` varchar(80) NOT NULL DEFAULT '';
+ALTER TABLE `orders` ADD COLUMN `district` varchar(80) NOT NULL DEFAULT '';
+ALTER TABLE `orders` ADD COLUMN `product_sku` varchar(200) NOT NULL DEFAULT '';
+ALTER TABLE `orders` ADD COLUMN `product_name_list` varchar(400) NOT NULL DEFAULT '';
+ALTER TABLE `orders` ADD COLUMN `product_qty` varchar(100) NOT NULL DEFAULT '';
+ALTER TABLE `orders` ADD COLUMN `size` varchar(80) NOT NULL DEFAULT '';
+ALTER TABLE `orders` ADD COLUMN `bill_date` varchar(30) NOT NULL DEFAULT '';
+ALTER TABLE `orders` ADD COLUMN `courier_paid` decimal(12,2) NOT NULL DEFAULT 0.00;

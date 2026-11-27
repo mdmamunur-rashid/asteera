@@ -1,8 +1,11 @@
 import Link from "next/link";
-import { asc, desc, like, or } from "drizzle-orm";
+import { asc, desc, eq, inArray, like, or } from "drizzle-orm";
 import { db, schema } from "@/db";
+import type { DupOrder } from "@/components/DuplicatesModalClient";
+import OrderSheetClient, { type OrderSheetRow, type SkuCatalogEntry } from "@/components/OrderSheetClient";
 import SheetGridClient, { type SheetColumn } from "@/components/SheetGridClient";
-import { ORDER_STATUSES } from "@/lib/util";
+import { last10 } from "@/lib/util";
+import { acceptDuplicate, bulkOrderAction, deleteOrder } from "../sales/actions";
 import { saveSheetChanges } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -15,6 +18,120 @@ export default async function SheetEditPage({
   const { tab: rawTab, q, ok, error } = await searchParams;
   const tab = rawTab === "orders" || rawTab === "purchases" ? rawTab : "inventory";
   const term = q ? `%${q}%` : null;
+
+  if (tab === "orders") {
+    const [orders, allItems] = await Promise.all([
+      db.select().from(schema.orders).orderBy(desc(schema.orders.id)).limit(500),
+      db.select({ sku: schema.items.sku, name: schema.items.name, size: schema.items.size, salePrice: schema.items.salePrice })
+        .from(schema.items).orderBy(asc(schema.items.sku)),
+    ]);
+
+    const orderIds = orders.map((o) => o.id);
+    const lines = orderIds.length > 0
+      ? await db.select({
+          orderId: schema.orderLines.orderId,
+          sku: schema.items.sku,
+          name: schema.items.name,
+          size: schema.items.size,
+          qty: schema.orderLines.qty,
+          price: schema.orderLines.price,
+        })
+          .from(schema.orderLines)
+          .innerJoin(schema.items, eq(schema.items.id, schema.orderLines.itemId))
+          .where(inArray(schema.orderLines.orderId, orderIds))
+      : [];
+
+    const linesByOrder = new Map<number, typeof lines>();
+    for (const l of lines) {
+      const arr = linesByOrder.get(l.orderId) ?? [];
+      arr.push(l);
+      linesByOrder.set(l.orderId, arr);
+    }
+
+    const initialRows: OrderSheetRow[] = orders.map((o, idx) => {
+      const oLines = linesByOrder.get(o.id) ?? [];
+      const fallbackSkus = oLines.map((l) => l.sku).join(", ");
+      const fallbackNames = oLines.map((l) => l.name).join(" / ");
+      const fallbackQtys = oLines.map((l) => String(l.qty)).join(", ");
+      const fallbackSizes = oLines.map((l) => l.size).filter(Boolean).join(" / ");
+      return {
+        id: o.id,
+        queryNo: o.queryNo || String(orders.length - idx),
+        websiteOrderNo: o.websiteOrderNo,
+        initiateBy: o.initiateBy,
+        pageName: o.pageName,
+        date: o.date,
+        productNameList: o.productNameList || fallbackNames,
+        productSku: o.productSku || fallbackSkus,
+        productQty: o.productQty || fallbackQtys,
+        size: o.size || fallbackSizes,
+        total: o.total,
+        deliveryCharge: o.deliveryCharge,
+        paid: o.paid,
+        discount: o.discount,
+        cod: Math.max(0, o.total - o.paid),
+        note: o.note,
+        paymentMode: o.paymentMode,
+        customerName: o.customerName,
+        phone: o.phone,
+        address: o.address,
+        district: o.district,
+        status: o.status,
+        courier: o.courier,
+        invoiceNo: o.invoiceNo,
+        trackingNo: o.trackingNo,
+        billDate: o.billDate,
+        courierPaid: o.courierPaid,
+        dupAccepted: o.dupAccepted,
+      };
+    });
+
+    const dupOrdersByPhone10: Record<string, DupOrder[]> = {};
+    for (const o of orders) {
+      const p10 = last10(o.phone);
+      if (p10.length < 10 || o.status === "Cancelled") continue;
+      const oLines = linesByOrder.get(o.id) ?? [];
+      (dupOrdersByPhone10[p10] ??= []).push({
+        id: o.id,
+        invoiceNo: o.invoiceNo,
+        date: o.date,
+        customerName: o.customerName,
+        phone: o.phone,
+        address: o.address,
+        pageName: o.pageName,
+        status: o.status,
+        paymentMode: o.paymentMode,
+        total: o.total,
+        paid: o.paid,
+        courier: o.courier,
+        trackingNo: o.trackingNo,
+        note: o.note,
+        dupAccepted: o.dupAccepted,
+        items: oLines.map((l) => ({ sku: l.sku, name: l.name, size: l.size, qty: l.qty, price: l.price })),
+      });
+    }
+
+    const skuCatalog: SkuCatalogEntry[] = allItems.map((i) => ({
+      sku: i.sku, name: i.name, size: i.size, salePrice: i.salePrice,
+    }));
+
+    return (
+      <>
+        <h2>Order Sheet</h2>
+        {error && <div className="err">{error}</div>}
+        {ok && <div className="card" style={{ background: "#d1fae5", color: "#065f46" }}>{ok}</div>}
+        <OrderSheetClient
+          initialRows={initialRows}
+          skuCatalog={skuCatalog}
+          dupOrdersByPhone10={dupOrdersByPhone10}
+          saveAction={saveSheetChanges}
+          bulkAction={bulkOrderAction}
+          acceptAction={acceptDuplicate}
+          deleteAction={deleteOrder}
+        />
+      </>
+    );
+  }
 
   let columns: SheetColumn[] = [];
   let initialRows: Record<string, string | number>[] = [];
@@ -37,31 +154,6 @@ export default async function SheetEditPage({
     initialRows = items.map((i) => ({
       id: i.id, sku: i.sku, name: i.name, size: i.size, type: i.type, category: i.category,
       purchasePrice: i.purchasePrice, salePrice: i.salePrice, reorderLevel: i.reorderLevel, imageUrl: i.imageUrl ?? "",
-    }));
-  } else if (tab === "orders") {
-    const orders = await db.select().from(schema.orders)
-      .where(term ? or(like(schema.orders.invoiceNo, term), like(schema.orders.customerName, term), like(schema.orders.phone, term)) : undefined)
-      .orderBy(desc(schema.orders.id)).limit(100);
-    columns = [
-      { key: "invoiceNo", label: "Invoice", width: 120 },
-      { key: "date", label: "Date", type: "date", width: 125 },
-      { key: "customerName", label: "Customer", width: 150 },
-      { key: "phone", label: "Phone", width: 120 },
-      { key: "address", label: "Address", width: 180 },
-      { key: "pageName", label: "Brand", width: 100 },
-      { key: "status", label: "Status", type: "select", options: ORDER_STATUSES.map((s) => ({ value: s, label: s })), width: 120 },
-      { key: "deliveryCharge", label: "Delivery", type: "number", width: 85 },
-      { key: "discount", label: "Discount", type: "number", width: 85 },
-      { key: "total", label: "Total", type: "number", width: 95 },
-      { key: "paid", label: "Paid", type: "number", width: 95 },
-      { key: "courier", label: "Courier", width: 95 },
-      { key: "trackingNo", label: "Tracking", width: 120 },
-      { key: "note", label: "Note", width: 150 },
-    ];
-    initialRows = orders.map((o) => ({
-      id: o.id, invoiceNo: o.invoiceNo, date: o.date, customerName: o.customerName, phone: o.phone,
-      address: o.address, pageName: o.pageName, status: o.status, deliveryCharge: o.deliveryCharge,
-      discount: o.discount, total: o.total, paid: o.paid, courier: o.courier, trackingNo: o.trackingNo, note: o.note,
     }));
   } else {
     const [pos, sups] = await Promise.all([
@@ -90,7 +182,7 @@ export default async function SheetEditPage({
 
       <div className="tabs">
         <Link href="/sheet-edit?tab=inventory" className={`tab ${tab === "inventory" ? "active" : ""}`}>Inventory / SKUs</Link>
-        <Link href="/sheet-edit?tab=orders" className={`tab ${tab === "orders" ? "active" : ""}`}>Orders / Sales</Link>
+        <Link href="/sheet-edit?tab=orders" className="tab">Orders / Sales</Link>
         <Link href="/sheet-edit?tab=purchases" className={`tab ${tab === "purchases" ? "active" : ""}`}>Purchase Orders</Link>
       </div>
 
@@ -100,7 +192,7 @@ export default async function SheetEditPage({
         <button className="btn secondary">Search</button>
       </form>
 
-      <SheetGridClient key={`${tab}-${q ?? ""}`} tab={tab} columns={columns} initialRows={initialRows} saveAction={saveSheetChanges} />
+      <SheetGridClient tab={tab} columns={columns} initialRows={initialRows} saveAction={saveSheetChanges} />
     </>
   );
 }

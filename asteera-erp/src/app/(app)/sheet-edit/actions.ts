@@ -46,23 +46,36 @@ export async function saveSheetChanges(f: FormData) {
         if (!id) continue;
         const st = String(r.status ?? "Billed");
         await tx.update(schema.orders).set({
+          queryNo: String(r.queryNo ?? "").trim(),
+          websiteOrderNo: String(r.websiteOrderNo ?? "").trim(),
+          initiateBy: String(r.initiateBy ?? "").trim(),
+          pageName: String(r.pageName ?? "").trim(),
           date: String(r.date ?? "").slice(0, 10),
+          productNameList: String(r.productNameList ?? "").trim(),
+          productSku: String(r.productSku ?? "").trim(),
+          productQty: String(r.productQty ?? "").trim(),
+          size: String(r.size ?? "").trim(),
+          total: Number(r.total) || 0,
+          deliveryCharge: Number(r.deliveryCharge) || 0,
+          paid: Number(r.paid) || 0,
+          discount: Number(r.discount) || 0,
+          note: String(r.note ?? "").trim(),
+          paymentMode: String(r.paymentMode) === "Paid" ? "Paid" : "COD",
           customerName: String(r.customerName ?? "").trim(),
           phone: String(r.phone ?? "").trim(),
           address: String(r.address ?? "").trim(),
-          pageName: String(r.pageName ?? "").trim(),
+          district: String(r.district ?? "").trim(),
           status: ORDER_STATUSES.includes(st) ? st : "Billed",
-          deliveryCharge: Number(r.deliveryCharge) || 0,
-          discount: Number(r.discount) || 0,
-          total: Number(r.total) || 0,
-          paid: Number(r.paid) || 0,
           courier: String(r.courier ?? "").trim(),
+          invoiceNo: String(r.invoiceNo ?? "").trim(),
           trackingNo: String(r.trackingNo ?? "").trim(),
-          note: String(r.note ?? "").trim(),
+          billDate: String(r.billDate ?? "").slice(0, 10),
+          courierPaid: Number(r.courierPaid) || 0,
         }).where(eq(schema.orders.id, id));
       }
     });
     revalidatePath("/sales");
+    revalidatePath("/wholesale");
   } else if (tab === "purchases") {
     await db.transaction(async (tx) => {
       for (const r of rows) {
